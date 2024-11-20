@@ -144,7 +144,7 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
         None. out_file written with updated positions.
 
         """
-         print("Loading micasense images")
+        print("Loading micasense images")
     
         mica_events = []
         mica_pos = []
