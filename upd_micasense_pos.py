@@ -22,7 +22,7 @@ import glob
 import numpy as np
 import exifread
 import datetime
-from pyproj import TransformerGroup
+from pyproj.transformer import TransformerGroup
 
 ###############################################################################
 # Variable declarations, constants
