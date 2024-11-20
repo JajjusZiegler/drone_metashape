@@ -254,11 +254,11 @@ def proc_rgb():
     # change camera position accuracy to 0.1 m
     for camera in chunk.cameras:
         if camera.reference.location:
-            rtk_flag = camera.photo.meta.get("Rtk Flag")
+            rtk_flag = camera.photo.meta("Exif/Rtk Flag")
             if rtk_flag and int(rtk_flag) == 50:
-                std_lon = float(camera.photo.meta.get("Rtk Std Lon", 0.10))
-                std_lat = float(camera.photo.meta.get("Rtk Std Lat", 0.10))
-                std_hgt = float(camera.photo.meta.get("Rtk Std Hgt", 0.10))
+                std_lon = float(camera.photo.meta("Exif/Rtk Std Lon", 0.10))
+                std_lat = float(camera.photo.meta("Exif/Rtk Std Lat", 0.10))
+                std_hgt = float(camera.photo.meta("Exif/Rtk Std Hgt", 0.10))
                 camera.reference.accuracy = Metashape.Vector([std_lon, std_lat, std_hgt])
             else:
                 camera.reference.accuracy = Metashape.Vector([0.10, 0.10, 0.10])
