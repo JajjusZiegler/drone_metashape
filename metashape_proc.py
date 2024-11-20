@@ -32,6 +32,8 @@ Optional Inputs:
     4. When P1 (RGB camera) coordinates have to be blockshifted:
         - Path to file containing DRTK init and AUSPOS cartesian coords passed using "-drtk <path to file>".
 
+    This is an example input : -crs "4326" - multispec "D:\2024_dronecampaign\data\Metashape_proc_test\multispec" -rgb "D:\2024_dronecampaign\data\Metashape_proc_test\rgb"
+
 Summary:
     * Add RGB and multispectral images.
     * Stop script for user input on calibration images.
