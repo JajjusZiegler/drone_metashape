@@ -251,8 +251,6 @@ def proc_rgb():
     print("Aligning Cameras")
     # change camera position accuracy to 0.1 m
     for camera in chunk.cameras:
-        if not camera.type == Metashape.Camera.Type.Regular:  # skip camera track, if any
-            continue
         if not camera.reference.location:
             continue
         rtk_flag = camera.photo.meta["Exif/Rtk Flag"] if "Exif/Rtk Flag" in camera.photo.meta else None
