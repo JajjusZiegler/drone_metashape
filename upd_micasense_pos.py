@@ -22,7 +22,7 @@ import glob
 import numpy as np
 import exifread
 import datetime
-# from pyproj import TransformerGroup
+from pyproj import TransformerGroup
 
 ###############################################################################
 # Variable declarations, constants
@@ -40,7 +40,7 @@ LEAPSECS = 37
 GPSUTC_deltat = 0
 MICA_deltat = -18
 EPSG_4326 = 4326
-EPSG_GDA2020 = 7855
+EPSG_CH1903 = 2056
 
 
 ###############################################################################
@@ -144,8 +144,8 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
         None. out_file written with updated positions.
 
         """
-        print("Loading micasense images")
-        
+         print("Loading micasense images")
+    
         mica_events = []
         mica_pos = []
         mica_count = 0
@@ -159,17 +159,17 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
         # Fix in later PROJ version has been to chose transformation with fewer steps - which in the case of GDA2020
         # projected CS is the one chosen in Metashape as well.
         # see https://github.com/OSGeo/PROJ/pull/3248
-        # transf_group = TransformerGroup(EPSG_4326, int(epsg_crs))
+        transf_group = TransformerGroup(EPSG_4326, int(epsg_crs))
 
         # Specify pipeline to avoid issues with different transformers being chosen depending on PROJ version
         # More info:https://github.com/pyproj4/pyproj/issues/989#issuecomment-974149918
-        # step_count = []
-        # for tr in transf_group.transformers:
-        #     step_count.append(str(tr).count("step")) # count 'steps' in each pipeline
+        step_count = []
+        for tr in transf_group.transformers:
+                step_count.append(str(tr).count("step")) # count 'steps' in each pipeline
 
         # Revisit below fix to use transformer with fewer steps in case of any future updates to Metashape/PyProj/PROJ
-        # min_step_idx = step_count.index(min(step_count))
-        # transformer = transf_group.transformers[min_step_idx]
+        min_step_idx = step_count.index(min(step_count))
+        transformer = transf_group.transformers[min_step_idx]
 
         # List of MicaSense master band images
         os.chdir(micasense_folder)
