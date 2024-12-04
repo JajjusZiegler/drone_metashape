@@ -48,11 +48,11 @@ import os
 import sys
 import exifread
 from collections import defaultdict
-from upd_micasense_pos_custom import ret_micasense_pos
+from upd_micasense_pos import ret_micasense_pos
 import importlib
-import upd_micasense_pos_custom
+import upd_micasense_pos
 
-importlib.reload(upd_micasense_pos_custom)
+importlib.reload(upd_micasense_pos)
 from pathlib import Path
 
 # Note: External modules imported were installed through:
@@ -255,7 +255,7 @@ def proc_rgb():
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale=4, generic_preselection=False, reference_preselection=True,
+    chunk.matchPhotos(downscale=1, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     chunk.alignCameras()
     doc.save()
@@ -489,7 +489,7 @@ def proc_multispec():
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale=4, generic_preselection=False, reference_preselection=True,
+    chunk.matchPhotos(downscale=1, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     doc.save()
     print("Aligning cameras")
@@ -551,7 +551,7 @@ def proc_multispec():
 
 def resume_proc():
     # Process RGB chunk
-    proc_rgb()
+    #proc_rgb()
     # Process multispec chunk
     proc_multispec()
     print("End of script")
