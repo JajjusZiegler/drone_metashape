@@ -23,6 +23,7 @@ import numpy as np
 import exifread
 import datetime
 from pyproj.transformer import TransformerGroup
+from datetime import datetime
 
 ###############################################################################
 # Variable declarations, constants
@@ -118,11 +119,11 @@ def get_P1_position(MRK_file, file_count):
                 lon = float(m[7].split(",")[0])
                 ellh = float(m[8].split(",")[0])
                 
-                P1_events.append(camera_timestamp)
+                P1_events.append(camera_timestamp.timestamp())
                 P1_pos_mrk.append([lat, lon, ellh])
 
         
-def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_file, P1_shift_vec):
+def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_file, P1_shift_vec, mica_events_epoch, mica_pos, filelist):
         """
         Parameters
         ----------
@@ -138,6 +139,12 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
                 Path and name of output CSV file with udpated Easting/Norhting/Altitude for all MicaSense images
         P1_shift_vec : vector
                 Vector to be used to blockshift P1 positions. 
+        mica_events_epoch : list
+                List to store MicaSense event timestamps
+        mica_pos : list
+                List to store MicaSense positions
+        filelist : list
+                List to store MicaSense image file paths
 
         Returns
         -------
@@ -177,24 +184,40 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
         
         # Get timestamp of MicaSense images using exifread
         for file in filelist:
-                f = open(file, 'rb')
+            f = open(file, 'rb')
+            
+            # Read Exif tags
+            tags = exifread.process_file(f)
+            
+            # 20/12 adding this check to skip empty image files seen with old RedEdge sensor
+            if not tags:
+                continue
+            
+            mica_time = str(tags.get('EXIF DateTimeOriginal'))
+            mica_subsec_time = str(tags.get('EXIF SubSecTime'))
+            
+            if mica_time and mica_subsec_time:
+                #interpretation of SubSecTime for RedEdge from:
+                #https://github.com/micasense/imageprocessing/blob/master/micasense/metadata.py
+                # From micasense email: The code corrects negative subsecond time which was a bug years ago in the GPS chip, 
+                # but this has now been fixed. If you ever do encounter negative subsecond time, it should 
+                # be interpreted literally. You would subtract that from the time instead of adding the positive time.   
+                subsec = int(mica_subsec_time)
+                negative = 1.0
+                if subsec < 0:
+                    print(subsec)
+                    negative = -1.0
+                    subsec *= -1.0
+                subsec = float('0.{}'.format(int(subsec)))
+                subsec *= negative
+                millisec = subsec * 1e3
                 
-                # Read Exif tags
-                tags = exifread.process_file(f)
-                
-                # 20/12 adding this check to skip empty image files seen with old RedEdge sensor
-                if not tags:
-                        continue
-                
-                mica_time = str(tags.get('EXIF ModifyDate'))     
-                
-                # Extract the subsecond time from the ModifyDate
-                utc_time = datetime.datetime.strptime(mica_time, "%Y:%m:%d %H:%M:%S.%f")
-                
-                # Adjust for the MicaSense time delta
-                mica_timestamp = utc_time - datetime.timedelta(seconds = MICA_deltat)
+                utc_time = datetime.datetime.strptime(mica_time, "%Y:%m:%d %H:%M:%S")
+                temp_timestamp = utc_time + datetime.timedelta(milliseconds = millisec)
+                       
+                mica_timestamp = temp_timestamp - datetime.timedelta(seconds = MICA_deltat)
                 mica_events.append(mica_timestamp)
-                
+                        
                 # Get geotagged positions
                 latitude = tags.get('GPS GPSLatitude')
                 latitude_ref = tags.get('GPS GPSLatitudeRef')
@@ -202,30 +225,34 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
                 longitude_ref = tags.get('GPS GPSLongitudeRef')
                 altitude = tags.get('GPS GPSAltitude')
                 altitude_ref = tags.get('GPS GPSAltitudeRef')
-                 
+                         
                 if latitude:
-                        lat_value = _convert_to_degress(latitude)
+                    lat_value = _convert_to_degress(latitude)
                 if latitude_ref.values != 'N':
-                        lat_value = -lat_value           
+                    lat_value = -lat_value           
                 if longitude:
-                        lon_value = _convert_to_degress(longitude)
+                    lon_value = _convert_to_degress(longitude)
                 if longitude_ref.values != 'E':
-                        lon_value = -lon_value
+                    lon_value = -lon_value
                 if altitude:
-                        alt_value = float(altitude.values[0].num) / float(altitude.values[0].den)
+                    alt_value = float(altitude.values[0].num) / float(altitude.values[0].den)
                 if altitude_ref == 1:
-                        print("GPS altitude ref is below sea level")
+                    print("GPS altitude ref is below sea level")
 
                 # E, N = transformer.transform(lat_value, lon_value)
                 E, N = lat_value, lon_value  # Placeholder transformation
                 mica_pos.append([E, N, alt_value])
-                
+                        
                 # Just a print to show progress
                 if mica_count % 100 == 0:
-                        print(mica_count)
+                    print(mica_count)
                 mica_count = mica_count + 1
-                f.close()
+            else:
+                print(f"Skipping file {file} due to missing EXIF DateTimeOriginal or SubSecTime tag.")
+            f.close()
         
+        # Convert mica_events to Unix epoch format
+        mica_events_epoch = [event.timestamp() for event in mica_events]
                 
         # List of MRK file(s)
         mrk_file_count = 0
@@ -257,15 +284,16 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
         out_frame.write(rec) 
         
         count = 0
+        non_matching_images = []
         
         first_P1_timestamp = P1_first_timestamp[1]
         last_P1_timestamp = P1_last_timestamp[mrk_file_count]
 
-        for m_cam_time in mica_events:
+        for m_cam_time in mica_events_epoch:
                 P1_triggered = True 
                 a = find_nearest(P1_events, m_cam_time)
-                camera_time_sec = m_cam_time.timestamp()
-                P1_pos_time = P1_events[a].timestamp()
+                camera_time_sec = m_cam_time
+                P1_pos_time = P1_events[a]
                 
                 # MicaSense images captured before P1 started or after it stopped have time = 0, pos = 0     
                 if((camera_time_sec < first_P1_timestamp) or 
@@ -275,27 +303,29 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
                         upd_pos1 = [0, 0, 0]
                         upd_pos2 = [0, 0, 0]
                         P1_triggered = False
+                        non_matching_images.append((filelist[count], m_cam_time))
                         
                 # When more than one flight for same mission, also ignore MicaSense images that triggered between flights    
                 elif(mrk_file_count > 1):
                         for mrk_loop in range(1, mrk_file_count):
-                                if ((camera_time_sec > P1_last_timestamp[mrk_loop] and 
-                                         camera_time_sec < P1_first_timestamp[mrk_loop+1])):
+                                if ((camera_time_sec > P1_last_timestamp[mrk_loop]) and 
+                                         (camera_time_sec < P1_first_timestamp[mrk_loop+1])):
                                         time1 = 0
                                         time2 = 0
                                         upd_pos1 = [0, 0, 0]
                                         upd_pos2 = [0, 0, 0]
                                         P1_triggered = False
+                                        non_matching_images.append((filelist[count], m_cam_time))
                                         
                 # Update MicaSense position for images that triggered within P1 times.           
                 if P1_triggered:    
                         if P1_pos_time <= camera_time_sec:
                                 time1 = P1_pos_time
-                                time2 = P1_events[a+1].timestamp()
+                                time2 = P1_events[a+1]
                                 upd_pos1 = P1_pos[a]
                                 upd_pos2 = P1_pos[a+1]
                         elif P1_pos_time > camera_time_sec:
-                                time1 = P1_events[a-1].timestamp()
+                                time1 = P1_events[a-1]
                                 time2 = P1_pos_time
                                 upd_pos1 = P1_pos[a-1]
                                 upd_pos2 = P1_pos[a]
@@ -312,7 +342,7 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
                 path_image_name = filelist[count]
                 image_name = path_image_name.split("\\")[-1]
                 
-                pos_index = mica_events.index(m_cam_time)
+                pos_index = mica_events_epoch.index(m_cam_time)
                 
                 # For images captured within P1 times, write updated Easting, Northing, Ellipsoidal height to CSV
                 if(upd_micasense_pos[2]!=0):
@@ -329,3 +359,11 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
                 
         # Close the CSV file
         out_frame.close()
+
+        # Raise message for non-matching images at the end
+        if non_matching_images:
+                print("The following MicaSense images do not match the timeframe of P1 images:")
+                for img, img_time in non_matching_images:
+                        img_name = img.split("\\")[-1]
+                        img_time_formatted = datetime.datetime.fromtimestamp(img_time).strftime('%Y-%m-%d %H:%M:%S.%f%z')
+                        print(f"{img_name} at {img_time_formatted}")
