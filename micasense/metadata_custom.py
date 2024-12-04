@@ -35,7 +35,7 @@ import pytz
 
 class Metadata(object):
     """ Container for Micasense image metadata"""
-    def __init__(self, filename: str, exiftool_path="C:/Program Files/exiftool-13.03_64/exiftool.exe", exiftool_obj=None):
+    def __init__(self, filename: str, exiftool_path="C:/Program Files/exiftool-13.01_64/exiftool.exe", exiftool_obj=None):
         if exiftool_obj is not None:
             self.exif = exiftool_obj.get_metadata(filename)
             return
