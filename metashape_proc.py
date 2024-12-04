@@ -32,6 +32,8 @@ Optional Inputs:
     4. When P1 (RGB camera) coordinates have to be blockshifted:
         - Path to file containing DRTK init and AUSPOS cartesian coords passed using "-drtk <path to file>".
 
+    This is an example input : -crs "4326" -multispec "D:\2024_dronecampaign\data\Metashape_proc_test\multispec" -rgb "D:\2024_dronecampaign\data\Metashape_proc_test\rgb"
+
 Summary:
     * Add RGB and multispectral images.
     * Stop script for user input on calibration images.
@@ -244,14 +246,23 @@ def proc_rgb():
     print("Update GPS/INS offset for P1")
     chunk.sensors[0].antenna.location_ref = Metashape.Vector(P1_GIMBAL1_OFFSET)
     print(chunk.sensors[0].antenna.location_ref)
-
-    #
     # Align Photos
     #
     print("Aligning Cameras")
     # change camera position accuracy to 0.1 m
+    for camera in chunk.cameras:
+        if not camera.reference.location:
+            continue
+        rtk_flag = camera.photo.meta["Exif/Rtk Flag"] if "Exif/Rtk Flag" in camera.photo.meta else None
+        if rtk_flag and int(rtk_flag) == 50:
+            std_lon = float(camera.photo.meta["Exif/Rtk Std Lon"]) if "Exif/Rtk Std Lon" in camera.photo.meta else 0.10
+            std_lat = float(camera.photo.meta["Exif/Rtk Std Lat"]) if "Exif/Rtk Std Lat" in camera.photo.meta else 0.10
+            std_hgt = float(camera.photo.meta["Exif/Rtk Std Hgt"]) if "Exif/Rtk Std Hgt" in camera.photo.meta else 0.10
+            camera.reference.accuracy = Metashape.Vector([std_lon, std_lat, std_hgt])
+        else:
+            camera.reference.accuracy = Metashape.Vector([0.10, 0.10, 0.10])
     chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
-
+    
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # Quality:  High, Reference Preselection: Source
@@ -259,7 +270,7 @@ def proc_rgb():
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     chunk.alignCameras()
     doc.save()
-
+    
     #
     # Optimise Cameras
     #
