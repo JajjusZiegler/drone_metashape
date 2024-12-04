@@ -140,7 +140,7 @@ class Metadata(object):
             utc_time = timezone.localize(utc_time)
         else:
             utc_time = None
-        return utc_time.strftime("%Y:%m:%d %H:%M:%S.%f") if utc_time else None
+        return utc_time if utc_time else None
 
     def dls_pose(self):
         """ get DLS pose as local earth-fixed yaw, pitch, roll in radians """
