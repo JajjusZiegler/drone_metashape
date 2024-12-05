@@ -250,7 +250,7 @@ def proc_rgb():
     #
     print("Aligning Cameras")
     # change camera position accuracy to 0.1 m
-    chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
+    # chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
 
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
@@ -645,6 +645,7 @@ p1_images = find_files(MRK_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
 chunk = doc.addChunk()
 chunk.label = CHUNK_RGB
 chunk.addPhotos(p1_images)
+chunk.loadReferenceExif(load_rotation=True, load_accuracy=True)
 
 # Check that chunk is not empty and images are in default WGS84 CRS
 if len(chunk.cameras) == 0:
