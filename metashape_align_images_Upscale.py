@@ -87,7 +87,8 @@ def load_images():
     p1_images = find_files(MRK_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
     chunk = doc.addChunk()
     chunk.label = CHUNK_RGB
-    chunk.addPhotos(p1_images, load_xmp_metadata=True)
+    chunk.addPhotos(p1_images)
+    chunk.loadReferenceExif(load_rotation=True, load_accuracy=True)
 
     # Check that chunk is not empty and images are in default WGS84 CRS
     if len(chunk.cameras) == 0:
