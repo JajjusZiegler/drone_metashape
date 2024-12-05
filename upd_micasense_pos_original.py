@@ -40,9 +40,9 @@ P1_last_timestamp = {}
 
 LEAPSECS = 37
 GPSUTC_deltat = 0
-MICA_deltat = -18
+MICA_deltat = 0
 EPSG_4326 = 4326
-EPSG_GDA2020 = 7855
+EPSG_CH1903 = 2056
 
 
 ###############################################################################
