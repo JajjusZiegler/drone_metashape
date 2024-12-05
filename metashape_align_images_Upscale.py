@@ -39,7 +39,7 @@ def load_images():
                micasense_path = Path(args.multispec)
                site_name = micasense_path.parts[-2]
                date = micasense_path.parts[-1]
-               proj_file = Path(f"M:/working_package_2/2024_dronecampaign/02_processing/metashape_projects/{site_name}/{date}/metashape_project.psx")
+               proj_file = Path(f"{proj_directory}/{site_name}/{date}/metashape_project.psx")
                proj_file.parent.mkdir(parents=True, exist_ok=True)
                print("Metashape project saved as %s" % proj_file)
                doc.save(proj_file)
