@@ -33,16 +33,16 @@ def load_images():
     # Directory to save Metashape projects. Set this according to your project structure.
     proj_directory = Path("M:/working_package_2/2024_dronecampaign/02_processing/metashape_projects")
 
-    # This saves the prject. It expects the multispec folder to be in the following structure: 
+    # This saves the project. It expects the multispec folder to be in the following structure: 
     #  ...\Micasense\Pynwald\20240613\...
     if args.multispec:
-               micasense_path = Path(args.multispec)
-               site_name = micasense_path.parts[-2]
-               date = micasense_path.parts[-1]
-               proj_file = Path(f"{proj_directory}/{site_name}/{date}/metashape_project.psx")
-               proj_file.parent.mkdir(parents=True, exist_ok=True)
-               print("Metashape project saved as %s" % proj_file)
-               doc.save(proj_file)
+        micasense_path = Path(args.multispec)
+        site_name = micasense_path.parts[-2]
+        date = micasense_path.parts[-1]
+        proj_file = Path(f"{proj_directory}/{site_name}/{date}/metashape_project.psx")
+        proj_file.parent.mkdir(parents=True, exist_ok=True)
+        print("Metashape project saved as %s" % proj_file)
+        doc.save(str(proj_file))  # Convert WindowsPath to string
 
     if args.rgb:
         MRK_PATH = args.rgb
