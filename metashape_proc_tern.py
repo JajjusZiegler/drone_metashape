@@ -39,6 +39,7 @@ Summary:
 
 """
 
+
 import argparse
 import math
 import collections
@@ -139,6 +140,34 @@ def find_files(folder, types):
             if (filename.lower().endswith(types)):
                 photo_list.append(os.path.join(dir, filename))
     return (photo_list)
+
+def copy_bounding_box(from_chunk, to_chunk):
+    """
+    Copy the bounding box from one chunk to another.
+    """
+    T0 = from_chunk.transform.matrix
+    
+    region = from_chunk.region
+    R0 = region.rot
+    C0 = region.center
+    s0 = region.size
+    
+    T = to_chunk.transform.matrix.inv() * T0
+    
+    R = Metashape.Matrix([[T[0, 0], T[0, 1], T[0, 2]],
+                         [T[1, 0], T[1, 1], T[1, 2]],
+                         [T[2, 0], T[2, 1], T[2, 2]]])
+    
+    scale = R.row(0).norm()
+    R = R * (1 / scale)
+    
+    new_region = Metashape.Region()
+    new_region.rot = R * R0
+    c = T.mulp(C0)
+    new_region.center = c
+    new_region.size = s0 * scale / 1.
+    
+    to_chunk.region = new_region
 
 
 def proc_rgb():
@@ -250,20 +279,27 @@ def proc_rgb():
     #
     print("Aligning Cameras")
     # change camera position accuracy to 0.1 m
-    chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
+    #chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
 
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale=1, generic_preselection=False, reference_preselection=True,
+    chunk.matchPhotos(downscale=8, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     chunk.alignCameras()
     doc.save()
 
     #
-    # Optimise Cameras
-    #
-    print("Optimise alignment")
+    # Gradual selection based on reprojection error to 0.5px
+    print("Gradual selection for reprojection error...")
+    f = Metashape.TiePoints.Filter()
+    threshold = 0.5
+    f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+    f.removePoints(threshold)
+    doc.save()
+
+    # Optimize camera alignment by adjusting intrinsic parameters
+    print("Optimizing camera alignment...")
     chunk.optimizeCameras()
     doc.save()
 
@@ -274,7 +310,7 @@ def proc_rgb():
     # downscale: ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
     print("Build dense cloud")
     # Medium quality. And default: mild filtering.
-    chunk.buildDepthMaps(downscale=4)
+    chunk.buildDepthMaps(downscale=8)
     doc.save()
 
     if METASHAPE_V2_PLUS:
@@ -369,6 +405,10 @@ def proc_multispec():
     chunk = doc.findChunk(dict_chunks[CHUNK_MULTISPEC])
 
     target_crs = Metashape.CoordinateSystem("EPSG::" + args.crs)
+
+    # increase bounding box to include all features in the model increasing by 20%
+
+
 
     # Get image suffix of master camera
     camera = chunk.cameras[0]
@@ -489,7 +529,7 @@ def proc_multispec():
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale=1, generic_preselection=False, reference_preselection=True,
+    chunk.matchPhotos(downscale=8, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     doc.save()
     print("Aligning cameras")
@@ -503,13 +543,23 @@ def proc_multispec():
     chunk.optimizeCameras()
     doc.save()
 
+
+    # Copy bounding box from RGB chunk to multispec chunk
+    copy_bounding_box(doc.findChunk(dict_chunks[CHUNK_RGB]), doc.findChunk(dict_chunks[CHUNK_MULTISPEC]))
+
     #
     # Build and export orthomosaic
     #
+
+
     # Import P1 model for use in orthorectification
     smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
     model_file = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_smooth_" + str(smooth_val) + ".obj")
     chunk.importModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
+
+    # Set bounding box to include all features in the model enlarged by 20%
+    
+    chunk.region *= 1.2
 
     print("Build orthomosaic")
     chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
@@ -581,6 +631,11 @@ global MRK_PATH, MICASENSE_PATH
 # Metashape project
 global doc
 doc = Metashape.app.document
+
+if doc is None:
+    print("Error: No active Metashape project found.")
+    sys.exit(1)
+
 proj_file = doc.path
 
 # if Metashape project has not been saved
@@ -625,6 +680,7 @@ P1_CAM_CSV = Path(proj_file).parent / "dbg_shifted_p1_pos.csv"
 # By default save the CSV with updated MicaSense positions in the MicaSense folder. CSV used within script.
 MICASENSE_CAM_CSV = Path(proj_file).parent / "interpolated_micasense_pos.csv"
 
+
 ##################
 # Add images
 ##################
@@ -633,7 +689,7 @@ MICASENSE_CAM_CSV = Path(proj_file).parent / "interpolated_micasense_pos.csv"
 p1_images = find_files(MRK_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
 chunk = doc.addChunk()
 chunk.label = CHUNK_RGB
-chunk.addPhotos(p1_images)
+chunk.addPhotos(p1_images, load_xmp_accuracy=True ) 
 
 # Check that chunk is not empty and images are in default WGS84 CRS
 if len(chunk.cameras) == 0:
