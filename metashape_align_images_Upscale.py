@@ -19,6 +19,8 @@ def load_images():
     parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh low/med/high', default="low")
     parser.add_argument('-drtk', help='If RGB coordinates to be blockshifted, file containing \
                                                       DRTK base station coordinates from field and AUSPOS')
+    
+    
 
     global args
     args = parser.parse_args()

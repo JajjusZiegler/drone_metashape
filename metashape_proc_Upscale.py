@@ -732,12 +732,14 @@ if args.smooth not in DICT_SMOOTH_STRENGTH:
 # Set quality values for the downscale value in RGB and Multispec for testing
 if args.test:
     quality1 = 4
-    quality2 = 4
+    quality2 = 8
     quality3 = 4
+    print("Test mode enabled: quality1 set to 4, quality2 set to 8, quality3 set to 4")
 else:
-    quality1 = 1  # default value for quality1
-    quality2 = 1 # default value for quality2
-    quality3 = 4  # default value for quality3
+    quality1 = 2  # default value for quality1
+    quality2 = 2  # default value for quality2
+    quality3 = 2  # default value for quality3
+    print("Default mode: quality1 set to 2, quality2 set to 2, quality3 set to 2")
 
 # Export blockshifted P1 positions. Not used in script. Useful for debug or to restart parts of script following any issues.
 P1_CAM_CSV = Path(proj_file).parent / "dbg_shifted_p1_pos.csv"
