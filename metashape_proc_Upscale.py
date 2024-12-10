@@ -500,7 +500,7 @@ def proc_multispec():
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale=1, generic_preselection=False, reference_preselection=True,
+    chunk.matchPhotos(downscale=8, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     doc.save()
     print("Aligning cameras")
