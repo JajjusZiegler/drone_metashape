@@ -308,7 +308,7 @@ def proc_rgb():
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale=8, generic_preselection=False, reference_preselection=True,
+    chunk.matchPhotos(downscale=4, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     chunk.alignCameras()
     doc.save()
@@ -334,7 +334,7 @@ def proc_rgb():
     # downscale: ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
     print("Build dense cloud")
     # Medium quality. And default: mild filtering.
-    chunk.buildDepthMaps(downscale=8)
+    chunk.buildDepthMaps(downscale=4)
     doc.save()
 
     if METASHAPE_V2_PLUS:
@@ -401,6 +401,13 @@ def proc_rgb():
                            image_format=Metashape.ImageFormatTIFF,
                            save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
         print("Exported orthomosaic " + str(ortho_file))
+
+    # Export the processing report
+    report_path = dir_path / (
+                Path(proj_file).stem + "_rgb_report.tif")
+    print(f"Exporting processing report to {report_path}...")
+    chunk.exportReport(report_path)
+    doc.save()
 
     print("RGB chunk processing complete!")
 
@@ -549,7 +556,7 @@ def proc_multispec():
     #
     # Calibrate Reflectance
     #
-    chunk.calibrateReflectance(use_reflectance_panels=True, use_sun_sensor=True)
+    chunk.calibrateReflectance(use_reflectance_panels=True, use_sun_sensor= args.sunsens)
 
     #
     # Align Photos
@@ -560,7 +567,7 @@ def proc_multispec():
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale=8, generic_preselection=False, reference_preselection=True,
+    chunk.matchPhotos(downscale=4, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     doc.save()
     print("Aligning cameras")
@@ -629,6 +636,13 @@ def proc_multispec():
                            save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
         print("Exported orthomosaic: " + str(ortho_file))
 
+    # Export the processing report
+    report_path = dir_path / (
+                Path(proj_file).stem + "_multispec_report.tif")
+    print(f"Exporting processing report to {report_path}...")
+    chunk.exportReport(report_path)
+    doc.save()
+        
     print("Multispec chunk processing complete!")
 
 
@@ -656,6 +670,7 @@ parser.add_argument('-rgb', help='path to RGB level0_raw folder that also has th
 parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh low/med/high', default="low")
 parser.add_argument('-drtk', help='If RGB coordinates to be blockshifted, file containing \
                                                   DRTK base station coordinates from field and AUSPOS')
+parser.add_argument('-sunsens', help='boolean to use sun sensor data for reflectance calibration', default=False)
 
 global args
 args = parser.parse_args()
