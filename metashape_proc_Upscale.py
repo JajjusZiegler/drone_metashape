@@ -309,7 +309,7 @@ def proc_rgb():
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale=4, generic_preselection=False, reference_preselection=True,
+    chunk.matchPhotos(downscale= quality1, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     chunk.alignCameras()
     doc.save()
@@ -335,7 +335,7 @@ def proc_rgb():
     # downscale: ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
     print("Build dense cloud")
     # Medium quality. And default: mild filtering.
-    chunk.buildDepthMaps(downscale=4)
+    chunk.buildDepthMaps(downscale= quality2)
     doc.save()
 
     if METASHAPE_V2_PLUS:
@@ -413,7 +413,7 @@ def proc_rgb():
 
         # Export the processing report
         report_path = dir_path / (
-                    Path(proj_file).stem + "_rgb_report.tif")
+                    Path(proj_file).stem + "_rgb_report.pdf")
         print(f"Exporting processing report to {report_path}...")
         chunk.exportReport(report_path)
         doc.save()
@@ -575,9 +575,9 @@ def proc_multispec():
     chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
 
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
-    # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8 # to be set below
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale=4, generic_preselection=False, reference_preselection=True,
+    chunk.matchPhotos(downscale= quality3 , generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     doc.save()
     print("Aligning cameras")
@@ -648,7 +648,7 @@ def proc_multispec():
 
     # Export the processing report
     report_path = dir_path / (
-                Path(proj_file).stem + "_multispec_report.tif")
+                Path(proj_file).stem + "_multispec_report.pdf")
     print(f"Exporting processing report to {report_path}...")
     chunk.exportReport(report_path)
     doc.save()
@@ -681,6 +681,7 @@ parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh 
 parser.add_argument('-drtk', help='If RGB coordinates to be blockshifted, file containing \
                                                   DRTK base station coordinates from field and AUSPOS')
 parser.add_argument('-sunsens', help='boolean to use sun sensor data for reflectance calibration', default=False)
+parser.add_argument('-test', help='boolean to make processing faster for debugging', default=False)
 
 global args
 args = parser.parse_args()
@@ -727,6 +728,16 @@ if args.drtk is not None:
 
 if args.smooth not in DICT_SMOOTH_STRENGTH:
     sys.exit("Value for -smooth must be one of low, medium or high.")
+
+# Set quality values for the downscale value in RGB and Multispec for testing
+if args.test:
+    quality1 = 4
+    quality2 = 4
+    quality3 = 4
+else:
+    quality1 = 1  # default value for quality1
+    quality2 = 1 # default value for quality2
+    quality3 = 4  # default value for quality3
 
 # Export blockshifted P1 positions. Not used in script. Useful for debug or to restart parts of script following any issues.
 P1_CAM_CSV = Path(proj_file).parent / "dbg_shifted_p1_pos.csv"
