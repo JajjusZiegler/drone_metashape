@@ -140,6 +140,59 @@ def find_files(folder, types):
                 photo_list.append(os.path.join(dir, filename))
     return (photo_list)
 
+def copyBoundingBox(from_chunk_label, to_chunk_labels):
+    print("Script started...")
+
+    doc = Metashape.app.document
+
+    from_chunk = None
+    for chunk in doc.chunks:
+        if chunk.label == from_chunk_label:
+            from_chunk = chunk
+            break
+
+    if not from_chunk:
+        print(f"Chunk with label '{from_chunk_label}' not found.")
+        return
+
+    to_chunks = []
+    for chunk in doc.chunks:
+        if chunk.label in to_chunk_labels:
+            to_chunks.append(chunk)
+
+    if not to_chunks:
+        print("No valid target chunks found.")
+        return
+
+    print("Copying bounding box from chunk '" + from_chunk.label + "' to " + str(len(to_chunks)) + " chunks...")
+
+    T0 = from_chunk.transform.matrix
+
+    region = from_chunk.region
+    R0 = region.rot
+    C0 = region.center
+    s0 = region.size
+
+    for chunk in to_chunks:
+        if chunk == from_chunk:
+            continue
+
+        T = chunk.transform.matrix.inv() * T0
+
+        R = Metashape.Matrix([[T[0, 0], T[0, 1], T[0, 2]],
+                              [T[1, 0], T[1, 1], T[1, 2]],
+                              [T[2, 0], T[2, 1], T[2, 2]]])
+
+        scale = R.row(0).norm()
+        R = R * (1 / scale)
+
+        new_region = Metashape.Region()
+        new_region.rot = R * R0
+        c = T.mulp(C0)
+        new_region.center = c
+        new_region.size = s0 * scale / 1.
+
+        chunk.region = new_region
 
 def proc_rgb():
     """
@@ -255,11 +308,18 @@ def proc_rgb():
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale=1, generic_preselection=False, reference_preselection=True,
+    chunk.matchPhotos(downscale=8, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     chunk.alignCameras()
     doc.save()
 
+    # Gradual selection based on reprojection error
+    print("Gradual selection for reprojection error...")
+    f = Metashape.TiePoints.Filter()
+    threshold = 0.5
+    f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+    f.removePoints(threshold)
+    doc.save()
     #
     # Optimise Cameras
     #
@@ -274,7 +334,7 @@ def proc_rgb():
     # downscale: ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
     print("Build dense cloud")
     # Medium quality. And default: mild filtering.
-    chunk.buildDepthMaps(downscale=4)
+    chunk.buildDepthMaps(downscale=8)
     doc.save()
 
     if METASHAPE_V2_PLUS:
@@ -507,12 +567,24 @@ def proc_multispec():
     chunk.alignCameras()
     doc.save()
 
+    # Gradual selection based on reprojection error
+    print("Gradual selection for reprojection error...")
+    f = Metashape.TiePoints.Filter()
+    threshold = 0.5
+    f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+    f.removePoints(threshold)
+    doc.save()
+
     #
     # Optimise Cameras
     #
     print("Optimise alignment")
     chunk.optimizeCameras()
     doc.save()
+
+    # copy bounding box from rgb chunk
+
+    copyBoundingBox(CHUNK_RGB, CHUNK_MULTISPEC)
 
     #
     # Build and export orthomosaic
