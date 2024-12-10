@@ -415,7 +415,7 @@ def proc_rgb():
         report_path = dir_path / (
                     Path(proj_file).stem + "_rgb_report.pdf")
         print(f"Exporting processing report to {report_path}...")
-        chunk.exportReport(report_path)
+        chunk.exportReport(path = str(report_path))
         doc.save()
 
         print("RGB chunk processing complete!")
@@ -650,7 +650,7 @@ def proc_multispec():
     report_path = dir_path / (
                 Path(proj_file).stem + "_multispec_report.pdf")
     print(f"Exporting processing report to {report_path}...")
-    chunk.exportReport(report_path)
+    chunk.exportReport(path = str(report_path))
     doc.save()
         
     print("Multispec chunk processing complete!")
@@ -731,14 +731,14 @@ if args.smooth not in DICT_SMOOTH_STRENGTH:
 
 # Set quality values for the downscale value in RGB and Multispec for testing
 if args.test:
-    quality1 = 4
-    quality2 = 8
-    quality3 = 4
+    quality1 = 4 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    quality2 = 8 #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
+    quality3 = 4 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     print("Test mode enabled: quality1 set to 4, quality2 set to 8, quality3 set to 4")
 else:
-    quality1 = 2  # default value for quality1
-    quality2 = 2  # default value for quality2
-    quality3 = 2  # default value for quality3
+    quality1 = 2  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    quality2 = 2  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
+    quality3 = 2  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     print("Default mode: quality1 set to 2, quality2 set to 2, quality3 set to 2")
 
 # Export blockshifted P1 positions. Not used in script. Useful for debug or to restart parts of script following any issues.
