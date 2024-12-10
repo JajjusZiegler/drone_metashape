@@ -310,7 +310,7 @@ def proc_rgb():
     # downscale: ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
     print("Build dense cloud")
     # Medium quality. And default: mild filtering.
-    chunk.buildDepthMaps(downscale=8)
+    chunk.buildDepthMaps(downscale=16)
     doc.save()
 
     if METASHAPE_V2_PLUS:
