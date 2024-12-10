@@ -55,6 +55,7 @@ import upd_micasense_pos_original
 importlib.reload(upd_micasense_pos_original)
 from pathlib import Path
 
+
 # Note: External modules imported were installed through:
 # "C:\Program Files\Agisoft\Metashape Pro\python\python.exe" -m pip install <modulename>
 # See M300 data processing protocol for more information.
@@ -365,51 +366,60 @@ def proc_rgb():
     model_file = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_smooth_" + str(smooth_val) + ".obj")
     chunk.exportModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
 
-    #
-    # Build and export orthomosaic
-    #
-    print("Build orthomosaic")
-    chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
-    doc.save()
 
-    if chunk.orthomosaic:
-        # Round resolution to 2 decimal places
-        res_xy = round(chunk.orthomosaic.resolution, 2)
+    #include test variable for debugging:
 
-        # if rgb/ folder does not exist in MRK_PATH save orthomosaic in the project directory
-        # else save ortho in rgb/level1_proc/
-        p1_idx = MRK_PATH.find("rgb")
-        if p1_idx == -1:
-            dir_path = Path(proj_file).parent
-            print("Cannot find rgb/ folder. Saving ortho in " + str(dir_path))
+    test = args.test #default is False 
+
+    if not test:
+        #
+        # Build and export orthomosaic
+        #
+        print("Build orthomosaic")
+        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
+        doc.save()
+
+        if chunk.orthomosaic:
+            # Round resolution to 2 decimal places
+            res_xy = round(chunk.orthomosaic.resolution, 2)
+
+            # if rgb/ folder does not exist in MRK_PATH save orthomosaic in the project directory
+            # else save ortho in rgb/level1_proc/
+            p1_idx = MRK_PATH.find("rgb")
+            if p1_idx == -1:
+                dir_path = Path(proj_file).parent
+                print("Cannot find rgb/ folder. Saving ortho in " + str(dir_path))
+            else:
+                # create p1/level1_proc folder if it does not exist
+                dir_path = Path(MRK_PATH[:p1_idx + len("rgb")]) / "level1_proc"
+                dir_path.mkdir(parents=True, exist_ok=True)
+
+            # file naming format: <projname>_rgb_ortho_<res_in_m>.tif
+            ortho_file = dir_path / (
+                    Path(proj_file).stem + "_rgb_ortho_" + str(res_xy).split('.')[1] + ".tif")
+
+            compression = Metashape.ImageCompression()
+            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW  # default on Metashape
+            compression.tiff_big = True
+            compression.tiff_tiled = True
+            compression.tiff_overviews = True
+
+            chunk.exportRaster(path=str(ortho_file), resolution_x=res_xy, resolution_y=res_xy,
+                               image_format=Metashape.ImageFormatTIFF,
+                               save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
+            print("Exported orthomosaic " + str(ortho_file))
         else:
-            # create p1/level1_proc folder if it does not exist
-            dir_path = Path(MRK_PATH[:p1_idx + len("rgb")]) / "level1_proc"
-            dir_path.mkdir(parents=True, exist_ok=True)
+            print("Skipping orthomosaic building and exporting due to test mode.")
 
-        # file naming format: <projname>_rgb_ortho_<res_in_m>.tif
-        ortho_file = dir_path / (
-                Path(proj_file).stem + "_rgb_ortho_" + str(res_xy).split('.')[1] + ".tif")
+        # Export the processing report
+        report_path = dir_path / (
+                    Path(proj_file).stem + "_rgb_report.tif")
+        print(f"Exporting processing report to {report_path}...")
+        chunk.exportReport(report_path)
+        doc.save()
 
-        compression = Metashape.ImageCompression()
-        compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW  # default on Metashape
-        compression.tiff_big = True
-        compression.tiff_tiled = True
-        compression.tiff_overviews = True
-
-        chunk.exportRaster(path=str(ortho_file), resolution_x=res_xy, resolution_y=res_xy,
-                           image_format=Metashape.ImageFormatTIFF,
-                           save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
-        print("Exported orthomosaic " + str(ortho_file))
-
-    # Export the processing report
-    report_path = dir_path / (
-                Path(proj_file).stem + "_rgb_report.tif")
-    print(f"Exporting processing report to {report_path}...")
-    chunk.exportReport(report_path)
-    doc.save()
-
-    print("RGB chunk processing complete!")
+        print("RGB chunk processing complete!")
+   
 
 
 def proc_multispec():
