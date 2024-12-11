@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+"""""
+This script processes images captured by DJI Zenmuse P1 (gimbal 1) and MicaSense RedEdge-MX/Dual (gimbal 2) sensors 
+using the Matrice 300 RTK drone system. It assumes a specific folder structure as per TERN protocols and provides 
+options to override raw data paths.
+The script performs the following tasks:
+1. Adds RGB and multispectral images to the Metashape project.
+2. Stops for user input on calibration images.
+3. Resumes processing to complete the workflow, including:
+    - Blockshifting P1 (RGB camera) coordinates if required.
+    - Converting coordinates to the target CRS.
+    - Checking image quality and removing low-quality images.
+    - Applying GPS/INS offsets.
+    - Aligning images.
+    - Building dense clouds and models.
+    - Smoothing and exporting models.
+    - Building and exporting orthomosaics.
+    - Calibrating reflectance for multispectral images.
+Functions:
+    - cartesian_to_geog(X, Y, Z): Converts Cartesian coordinates to geographic coordinates using WGS84 ellipsoid.
+    - find_files(folder, types): Finds files of specified types in a folder.
+    - copyBoundingBox(from_chunk_label, to_chunk_labels): Copies bounding box from one chunk to others.
+    - proc_rgb(): Processes RGB images to create orthomosaic and 3D model.
+    - proc_multispec(): Processes multispectral images to create orthomosaic with relative reflectance.
+    - resume_proc(): Resumes processing after user input on calibration images.
+Usage:
+    Run the script with the required and optional inputs as arguments. Follow the instructions in the console to 
+    complete the calibration steps and resume processing.
+"""""
 """
 Created August 2021
 
@@ -453,8 +481,16 @@ def proc_multispec():
 
     # file naming assumption: IMG_xxxx_suffixNum
     img_suffix_master = cam_master[2]
+    
+
+    #set P1_shift_vec to 0 if multionly is set
+    global P1_shift_vec
+    if args.multionly:
+        P1_shift_vec = np.array([0.0, 0.0, 0.0])
 
     print("Interpolate Micasense position based on P1 with blockshift" + str(P1_shift_vec))
+
+
 
     # inputs: paths to MRK file for P1 position, Micasense image path, image suffix for master band images, target CRS
     # returns output csv file with interpolated micasense positions
@@ -655,10 +691,10 @@ def proc_multispec():
         
     print("Multispec chunk processing complete!")
 
-
 def resume_proc():
-    # Process RGB chunk
-    proc_rgb()
+    # Process RGB chunk if multionly is not set
+    if not args.multionly:
+        proc_rgb()
     # Process multispec chunk
     proc_multispec()
     print("End of script")
@@ -682,6 +718,7 @@ parser.add_argument('-drtk', help='If RGB coordinates to be blockshifted, file c
                                                   DRTK base station coordinates from field and AUSPOS')
 parser.add_argument('-sunsens', help='boolean to use sun sensor data for reflectance calibration', default=False)
 parser.add_argument('-test', help='boolean to make processing faster for debugging', default=False)
+parser.add_argument('-multionly', help='boolean to process multispec chunk only', default=False)
 
 global args
 args = parser.parse_args()
@@ -736,9 +773,9 @@ if args.test:
     quality3 = 4 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     print("Test mode enabled: quality1 set to 4, quality2 set to 8, quality3 set to 4")
 else:
-    quality1 = 2  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-    quality2 = 2  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
-    quality3 = 2  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    quality1 = 0  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    quality2 = 1  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
+    quality3 = 0  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     print("Default mode: quality1 set to 2, quality2 set to 2, quality3 set to 2")
 
 # Export blockshifted P1 positions. Not used in script. Useful for debug or to restart parts of script following any issues.
@@ -749,36 +786,47 @@ MICASENSE_CAM_CSV = Path(proj_file).parent / "interpolated_micasense_pos.csv"
 ##################
 # Add images
 ##################
-#
-# rgb
-p1_images = find_files(MRK_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
-chunk = doc.addChunk()
-chunk.label = CHUNK_RGB
-chunk.addPhotos(p1_images)
-chunk.loadReferenceExif(load_rotation=True, load_accuracy=True)
+# If the multionli argument is not set, add images to the project
 
-# Check that chunk is not empty and images are in default WGS84 CRS
-if len(chunk.cameras) == 0:
-    sys.exit("Chunk rgb empty")
-# check chunk coordinate systems are default EPSG::4326
-if "EPSG::4326" not in str(chunk.crs):
-    sys.exit("Chunk rgb: script expects images loaded to be in CRS WGS84 EPSG::4326")
 
-#
-# multispec
-#
-micasense_images = find_files(MICASENSE_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
+if not args.multionly:
+    # rgb
+    # Used to find chunks in proc_*
+    p1_images = find_files(MRK_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
+    chunk = doc.addChunk()
+    chunk.label = CHUNK_RGB
+    chunk.addPhotos(p1_images, load_xmp_accuracy=True)
 
-chunk = doc.addChunk()
-chunk.label = CHUNK_MULTISPEC
-chunk.addPhotos(micasense_images)
-doc.save()
+    # Check that chunk is not empty and images are in default WGS84 CRS
+    if len(chunk.cameras) == 0:
+        sys.exit("Chunk rgb empty")
+    # check chunk coordinate systems are default EPSG::4326
+    if "EPSG::4326" not in str(chunk.crs):
+            sys.exit("Chunk rgb: script expects images loaded to be in CRS WGS84 EPSG::4326")
 
-# Check that chunk is not empty and images are in default WGS84 CRS
-if len(chunk.cameras) == 0:
-    sys.exit("Multispec chunk empty")
-if "EPSG::4326" not in str(chunk.crs):
-    sys.exit("Multispec chunk: script expects images loaded to be in CRS WGS84 EPSG::4326")
+    #
+    # multispec
+    #
+    micasense_images = find_files(MICASENSE_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
+
+    chunk = doc.addChunk()
+    chunk.label = CHUNK_MULTISPEC
+    chunk.addPhotos(micasense_images)
+    doc.save()
+else:
+    # Used to find chunks in proc_*
+    check_chunk_list = [CHUNK_RGB, CHUNK_MULTISPEC]
+    dict_chunks = {}
+    for get_chunk in doc.chunks:
+        dict_chunks.update({get_chunk.label: get_chunk.key})
+
+    chunk = doc.findChunk(dict_chunks[CHUNK_RGB])
+    if not chunk:
+        sys.exit("Chunk rgb not found in the project")
+    
+    chunk = doc.findChunk(dict_chunks[CHUNK_MULTISPEC])
+    if not chunk:
+        sys.exit("Chunk multispec not found in the project")
 
 # Check that lever-arm offsets are non-zero:
 # As this script is for RGB and MS images captured simultaneously on dual gimbal, lever-arm offsets cannot be 0.
@@ -788,6 +836,7 @@ if P1_GIMBAL1_OFFSET == 0:
     Metashape.app.messageBox(err_msg)
 
 # MicaSense: get Camera Model from one of the images to check the lever-arm offsets for the relevant model
+micasense_images = find_files(MICASENSE_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
 sample_img = open(micasense_images[0], 'rb')
 exif_tags = exifread.process_file(sample_img)
 cam_model = str(exif_tags.get('Image Model'))
