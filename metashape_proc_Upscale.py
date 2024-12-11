@@ -332,7 +332,7 @@ def proc_rgb():
     #
     print("Aligning Cameras")
     # change camera position accuracy to 0.1 m
-    # chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
+    chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
 
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
@@ -517,24 +517,24 @@ def proc_multispec():
             del_camera_names.append(camera.label)
 
     # Delete images outside of P1 capture times
-    # print("Deleting MicaSense images that triggered outside P1 capture times")
-    # for camera in chunk.cameras:
-    #     # Only calibration images are in a group. The following line is necessary to avoid NoneType error on other images
-    #     if camera.group is not None:
-    #         if camera.group.label == 'Calibration images':
-    #             continue
-    #     if camera.label in del_camera_names:
-    #         chunk.remove(camera)
-
-    # Disable images outside of P1 capture times
-    print("Disabling MicaSense images that triggered outside P1 capture times")
+    print("Deleting MicaSense images that triggered outside P1 capture times")
     for camera in chunk.cameras:
         # Only calibration images are in a group. The following line is necessary to avoid NoneType error on other images
         if camera.group is not None:
             if camera.group.label == 'Calibration images':
                 continue
         if camera.label in del_camera_names:
-            camera.enabled = False
+            chunk.remove(camera)
+
+    # Disable images outside of P1 capture times
+    # print("Disabling MicaSense images that triggered outside P1 capture times")
+    # for camera in chunk.cameras:
+    #     # Only calibration images are in a group. The following line is necessary to avoid NoneType error on other images
+    #     if camera.group is not None:
+    #         if camera.group.label == 'Calibration images':
+    #             continue
+    #     if camera.label in del_camera_names:
+    #         camera.enabled = False
             
 
     # save project
@@ -708,6 +708,7 @@ print("Script start")
 # Parse arguments and initialise variables
 parser = argparse.ArgumentParser(
     description='Update camera positions in P1 and/or MicaSense chunks in Metashape project')
+parser.add_argument('-proj_path', help='path to Metashape project file', default=False) 
 parser.add_argument('-crs',
                     help='EPSG code for target projected CRS for micasense cameras. E.g: 7855 for GDA2020/MGA zone 55',
                     required=True)
@@ -724,10 +725,14 @@ global args
 args = parser.parse_args()
 global MRK_PATH, MICASENSE_PATH
 
-# Metashape project
 global doc
-doc = Metashape.app.document
-proj_file = doc.path
+# Metashape project
+if args.proj_path:
+    doc = Metashape.Document()
+    proj_file = args.proj_path
+else:    
+    doc = Metashape.app.document
+    proj_file = doc.path
 
 # if Metashape project has not been saved
 if proj_file == '':
@@ -795,7 +800,7 @@ if not args.multionly:
     p1_images = find_files(MRK_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
     chunk = doc.addChunk()
     chunk.label = CHUNK_RGB
-    chunk.addPhotos(p1_images, load_xmp_accuracy=True)
+    chunk.addPhotos(p1_images) # , load_xmp_accuracy=True if you want to add accuracy from XMP
 
     # Check that chunk is not empty and images are in default WGS84 CRS
     if len(chunk.cameras) == 0:
