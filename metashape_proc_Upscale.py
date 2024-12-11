@@ -76,11 +76,11 @@ import os
 import sys
 import exifread
 from collections import defaultdict
-from upd_micasense_pos_original import ret_micasense_pos
+from upd_micasense_pos import ret_micasense_pos
 import importlib
-import upd_micasense_pos_original
+import upd_micasense_pos
 
-importlib.reload(upd_micasense_pos_original)
+importlib.reload(upd_micasense_pos)
 from pathlib import Path
 
 
@@ -93,6 +93,12 @@ METASHAPE_V2_PLUS = False
 found_version = Metashape.app.version.split('.')  # e.g. 2.0.1
 if int(found_version[0]) >= 2:
     METASHAPE_V2_PLUS = True
+
+###############################################################################
+# BASE DIRECTORY If you run multiple projects, update this path
+###############################################################################
+
+BASE_DIR = "M:/working_package_2/2024_dronecampaign/01_data/dronetest/processing_test"
 
 ###############################################################################
 # Constants
@@ -708,7 +714,9 @@ print("Script start")
 # Parse arguments and initialise variables
 parser = argparse.ArgumentParser(
     description='Update camera positions in P1 and/or MicaSense chunks in Metashape project')
-parser.add_argument('-proj_path', help='path to Metashape project file', default=False) 
+parser.add_argument('-proj_path', help='path to Metashape project file', default=False)
+parser.add_argument('-date', help='Date of flight in YYYYMMDD format', required=True)
+parser.add_argument('-site', help='Site name', required=True)
 parser.add_argument('-crs',
                     help='EPSG code for target projected CRS for micasense cameras. E.g: 7855 for GDA2020/MGA zone 55',
                     required=True)
@@ -736,10 +744,16 @@ else:
 
 # if Metashape project has not been saved
 if proj_file == '':
-    if args.rgb:
-        proj_file = str(Path(args.rgb).parents[0] / "metashape_project.psx")
-        print("Metashape project saved as %s" % proj_file)
-        doc.save(proj_file)
+        # Set the base directory for the project
+        # Create the project file path using site and date arguments if proj_path is not provided
+        if not args.proj_path:
+            site = args.site
+            date = args.date
+            proj_file = os.path.join(BASE_DIR, site, date, f"{site}_{date}_metashape.psx")
+            print(f"Metashape project will be saved as {proj_file}")
+            doc.save(proj_file)
+        else:
+            proj_file = args.proj_path
 
 if args.rgb:
     MRK_PATH = args.rgb
@@ -778,9 +792,9 @@ if args.test:
     quality3 = 4 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     print("Test mode enabled: quality1 set to 4, quality2 set to 8, quality3 set to 4")
 else:
-    quality1 = 0  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-    quality2 = 1  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
-    quality3 = 0  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    quality1 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    quality2 = 4  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
+    quality3 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     print("Default mode: quality1 set to 2, quality2 set to 2, quality3 set to 2")
 
 # Export blockshifted P1 positions. Not used in script. Useful for debug or to restart parts of script following any issues.
