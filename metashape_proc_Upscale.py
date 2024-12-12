@@ -79,6 +79,8 @@ from collections import defaultdict
 from upd_micasense_pos import ret_micasense_pos
 import importlib
 import upd_micasense_pos
+import csv
+
 
 importlib.reload(upd_micasense_pos)
 from pathlib import Path
@@ -96,9 +98,13 @@ if int(found_version[0]) >= 2:
 
 ###############################################################################
 # BASE DIRECTORY If you run multiple projects, update this path
+# Decoide if you want to use model or DEM or for Orthomoasaic
 ###############################################################################
 
 BASE_DIR = "M:/working_package_2/2024_dronecampaign/01_data/dronetest/processing_test"
+
+use_model = False
+use_dem = True
 
 ###############################################################################
 # Constants
@@ -381,27 +387,52 @@ def proc_rgb():
     #
     # Build Mesh
     #
-    print("Build mesh")
-    if METASHAPE_V2_PLUS:
-        chunk.buildModel(surface_type=Metashape.HeightField, source_data=Metashape.PointCloudData,
+    if use_model:
+
+        print("Build mesh")
+        if METASHAPE_V2_PLUS:
+            chunk.buildModel(surface_type=Metashape.HeightField, source_data=Metashape.PointCloudData,
                          face_count=Metashape.MediumFaceCount)
-    else:
-        chunk.buildModel(surface_type=Metashape.HeightField, source_data=Metashape.DenseCloudData,
+        else:
+            chunk.buildModel(surface_type=Metashape.HeightField, source_data=Metashape.DenseCloudData,
                          face_count=Metashape.MediumFaceCount)
-    doc.save()
-
-    # Decimate and smooth mesh to use as orthorectification surface
-    # Halve face count?
-    chunk.decimateModel(face_count=len(chunk.model.faces) / 2)
-    # Smooth model
-    smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
-    chunk.smoothModel(smooth_val)
-    # Export model for use in micasense chunk
-    model_file = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_smooth_" + str(smooth_val) + ".obj")
-    chunk.exportModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
+        doc.save()
 
 
-    #include test variable for debugging:
+
+        # Decimate and smooth mesh to use as orthorectification surface
+        # Halve face count?
+        chunk.decimateModel(face_count=len(chunk.model.faces) / 2)
+        # Smooth model
+        smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
+        chunk.smoothModel(smooth_val)
+        # Export model for use in micasense chunk
+        model_file = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_smooth_" + str(smooth_val) + ".obj")
+        chunk.exportModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
+
+    #
+    # Build DEM
+    #
+    compression = Metashape.ImageCompression()
+    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW  # default on Metashape
+    compression.tiff_big = True
+    compression.tiff_tiled = True
+    compression.tiff_overviews = True
+    
+    if use_dem:
+        print("Build DEM")
+    
+        # set resolution to 1 cm
+        dem_res_xy = 0.01
+
+        if METASHAPE_V2_PLUS:
+            chunk.buildDem(source_data=Metashape.PointCloudData,resolution = dem_res_xy )
+        else:
+            chunk.buildDem(source_data=Metashape.DenseCloudData,resolution = dem_res_xy )
+        doc.save()
+
+        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_" + str(dem_res_xy).split('.')[1] + ".tif")    
+        chunk.exportRaster(path=dem_file, source_data=Metashape.ElevationData, image_format=Metashape.ImageFormatTIFF, image_compression=compression)#include test variable for debugging:
 
     test = args.test #default is False 
 
@@ -414,8 +445,8 @@ def proc_rgb():
         doc.save()
 
         if chunk.orthomosaic:
-            # Round resolution to 2 decimal places
-            res_xy = round(chunk.orthomosaic.resolution, 2)
+            # set resolution to 1 cm
+            res_xy = 0.01
 
             # if rgb/ folder does not exist in MRK_PATH save orthomosaic in the project directory
             # else save ortho in rgb/level1_proc/
@@ -432,11 +463,6 @@ def proc_rgb():
             ortho_file = dir_path / (
                     Path(proj_file).stem + "_rgb_ortho_" + str(res_xy).split('.')[1] + ".tif")
 
-            compression = Metashape.ImageCompression()
-            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW  # default on Metashape
-            compression.tiff_big = True
-            compression.tiff_tiled = True
-            compression.tiff_overviews = True
 
             chunk.exportRaster(path=str(ortho_file), resolution_x=res_xy, resolution_y=res_xy,
                                image_format=Metashape.ImageFormatTIFF,
@@ -490,7 +516,7 @@ def proc_multispec():
     
 
     #set P1_shift_vec to 0 if multionly is set
-    global P1_shift_vec
+    global P1_shift_vec 
     if args.multionly:
         P1_shift_vec = np.array([0.0, 0.0, 0.0])
 
@@ -648,18 +674,28 @@ def proc_multispec():
     #
     # Build and export orthomosaic
     #
-    # Import P1 model for use in orthorectification
-    smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
-    model_file = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_smooth_" + str(smooth_val) + ".obj")
-    chunk.importModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
+    if use_model:
+        # Import P1 model for use in orthorectification
+        smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
+        model_file = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_smooth_" + str(smooth_val) + ".obj")
+        chunk.importModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
 
-    print("Build orthomosaic")
-    chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
-    doc.save()
+        print("Build orthomosaic")
+        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
+        doc.save()
+
+    if use_dem:
+        dem_res_xy = 0.01  # Define the resolution for DEM
+        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_" + str(dem_res_xy).split('.')[1] + ".tif")
+        chunk.importRaster(path=dem_file, crs=target_crs, format=Metashape.ImageFormatTIFF)
+
+        print("Build orthomosaic")
+        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
+        doc.save()
 
     if chunk.orthomosaic:
-        # Round resolution to 2 decimal places
-        res_xy = round(chunk.orthomosaic.resolution, 2)
+        # Set resolution to 5 cm
+        res_xy = 0.05
 
         # if multispec/ folder does not exist in MICASENSE_PATH save in project directory
         # else save ortho in multispec/level1_proc/
@@ -697,6 +733,34 @@ def proc_multispec():
         
     print("Multispec chunk processing complete!")
 
+
+# Write arguments to CSV file
+def write_arguments_to_csv():
+    global BASE_DIR
+    csv_file = os.path.join(BASE_DIR, "arguments_log.csv")
+    headers = ["proj_path"] + [arg for arg in vars(args).keys()]
+
+    # Collect argument values
+    row = [proj_file] + [str(getattr(args, arg)) for arg in vars(args).keys()]
+
+    # Check if the row already exists in the CSV file
+    if os.path.exists(csv_file):
+        with open(csv_file, mode='r', newline='') as file:
+            reader = csv.reader(file)
+            for existing_row in reader:
+                if existing_row == row:
+                    print("Row already exists in the CSV file. Skipping writing.")
+                    return
+
+    # Write the row to the CSV file
+    with open(csv_file, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        if file.tell() == 0:
+            writer.writerow(headers)  # Write headers if file is empty
+        writer.writerow(row)
+        print("Arguments written to CSV file.")
+
+# Resume processing
 def resume_proc():
     # Process RGB chunk if multionly is not set
     if not args.multionly:
@@ -704,6 +768,10 @@ def resume_proc():
     # Process multispec chunk
     proc_multispec()
     print("End of script")
+
+# Proceed to next project
+
+
 
 
 ############################################
@@ -714,7 +782,7 @@ print("Script start")
 # Parse arguments and initialise variables
 parser = argparse.ArgumentParser(
     description='Update camera positions in P1 and/or MicaSense chunks in Metashape project')
-parser.add_argument('-proj_path', help='path to Metashape project file', default=False)
+parser.add_argument('-proj_path', help='path to Metashape project file')
 parser.add_argument('-date', help='Date of flight in YYYYMMDD format', required=True)
 parser.add_argument('-site', help='Site name', required=True)
 parser.add_argument('-crs',
@@ -738,22 +806,29 @@ global doc
 if args.proj_path:
     doc = Metashape.Document()
     proj_file = args.proj_path
+    doc.open(proj_file, read_only=False)  # Open the document in editable mode
 else:    
-    doc = Metashape.app.document
+    doc = Metashape.Document()
     proj_file = doc.path
 
+if doc is None:
+    print("Error: Metashape document object is not initialized.")
+    
+# if Metashape project has not been saved
+# Set the base directory for the project
+# Create the project file path using site and date arguments if proj_path is not provided
 # if Metashape project has not been saved
 if proj_file == '':
-        # Set the base directory for the project
-        # Create the project file path using site and date arguments if proj_path is not provided
-        if not args.proj_path:
-            site = args.site
-            date = args.date
-            proj_file = os.path.join(BASE_DIR, site, date, f"{site}_{date}_metashape.psx")
-            print(f"Metashape project will be saved as {proj_file}")
+        site = args.site
+        date = args.date
+        proj_file = os.path.join(BASE_DIR, site, date, f"{site}_{date}_metashape.psx")
+        if not os.path.exists(proj_file):
             doc.save(proj_file)
-        else:
-            proj_file = args.proj_path
+        print(f"Metashape project will be saved as {proj_file}")
+        doc.open(proj_file, read_only=False)  # Open the document in editable mode
+        doc.save(proj_file)
+else:
+        proj_file = args.proj_path
 
 if args.rgb:
     MRK_PATH = args.rgb
@@ -889,6 +964,14 @@ if 'Chunk 1' in dict_chunks:
     chunk = doc.findChunk(dict_chunks['Chunk 1'])
     doc.remove(chunk)
     doc.save()
+
+
+
+write_arguments_to_csv()
+
+
+# Open the Metashape document
+doc.open(proj_file, read_only=False)  # Open the document
 #
 # # Stop script here. User to click 'Resume Processing' once following steps are complete.
 # # see resume_proc() for processing steps.
@@ -915,6 +998,25 @@ print("###########################")
 label = "Resume processing"
 Metashape.app.removeMenuItem(label)
 Metashape.app.addMenuItem(label, resume_proc)
+
+label1 = "Proceed to next prject"
+Metashape.app.removeMenuItem(label1)
+Metashape.app.addMenuItem(label1, proceed_to_next_project)
 Metashape.app.messageBox(
-    "Complete Steps 1 to 3 listed on the Console tab and then click on 'Resume Processing' in the toolbar")
+        "Complete Steps 1 to 3 listed on the Console tab and then click on 'Resume Processing' in the toolbar"
+        "Completed loading images and created file structure. Click on 'Proceed to next project' in the toolbar to continue with the next project or Click .")
+
+def main():
+    # Access arguments
+    script_path = sys.argv[0]
+    arguments = sys.argv[1:]
+    
+    # Process arguments
+    for i in range(0, len(arguments), 2):
+        key = arguments[i]
+        value = arguments[i + 1]
+        print(f"{key}: {value}")
+
+if __name__ == "__main__":
+    main()
 
