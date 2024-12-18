@@ -686,7 +686,7 @@ def proc_multispec():
 
     if use_dem:
         dem_res_xy = 0.01  # Define the resolution for DEM
-        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_" + str(dem_res_xy).split('.')[1] + ".tif")
+        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_" + str(dem_res_xy).replace('.', '') + ".tif")
         chunk.importRaster(path=dem_file, crs=target_crs, format=Metashape.ImageFormatTIFF)
 
         print("Build orthomosaic")
@@ -737,7 +737,7 @@ def proc_multispec():
 # Write arguments to CSV file
 def write_arguments_to_csv():
     global BASE_DIR
-    csv_file = os.path.join(BASE_DIR, "arguments_log.csv")
+    csv_file = os.path.join(BASE_DIR, "arguments_logstep2.csv")
     headers = ["proj_path"] + [arg for arg in vars(args).keys()]
 
     # Collect argument values
@@ -773,7 +773,6 @@ def resume_proc():
 
 
 
-
 ############################################
 ##  Main code
 ############################################
@@ -792,7 +791,7 @@ parser.add_argument('-multispec', help='path to multispectral level0_raw folder 
 parser.add_argument('-rgb', help='path to RGB level0_raw folder that also has the MRK files')
 parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh low/med/high', default="low")
 parser.add_argument('-drtk', help='If RGB coordinates to be blockshifted, file containing \
-                                                  DRTK base station coordinates from field and AUSPOS')
+                                                  DRTK base station coordinates from field and AUSPOS', default=None)
 parser.add_argument('-sunsens', help='boolean to use sun sensor data for reflectance calibration', default=False)
 parser.add_argument('-test', help='boolean to make processing faster for debugging', default=False)
 parser.add_argument('-multionly', help='boolean to process multispec chunk only', default=False)
@@ -969,6 +968,7 @@ if 'Chunk 1' in dict_chunks:
 
 write_arguments_to_csv()
 
+resume_proc()
 
 # Open the Metashape document
 doc.open(proj_file, read_only=False)  # Open the document
@@ -995,28 +995,28 @@ print("###########################")
 print("###########################")
 print("###########################")
 
-label = "Resume processing"
-Metashape.app.removeMenuItem(label)
-Metashape.app.addMenuItem(label, resume_proc)
+"""     label = "Resume processing"
+    Metashape.app.removeMenuItem(label)
+    Metashape.app.addMenuItem(label, resume_proc)
 
-label1 = "Proceed to next prject"
-Metashape.app.removeMenuItem(label1)
-Metashape.app.addMenuItem(label1, proceed_to_next_project)
-Metashape.app.messageBox(
-        "Complete Steps 1 to 3 listed on the Console tab and then click on 'Resume Processing' in the toolbar"
-        "Completed loading images and created file structure. Click on 'Proceed to next project' in the toolbar to continue with the next project or Click .")
+    label1 = "Proceed to next prject"
+    Metashape.app.removeMenuItem(label1)
+    Metashape.app.addMenuItem(label1, proceed_to_next_project)
+    Metashape.app.messageBox(
+            "Complete Steps 1 to 3 listed on the Console tab and then click on 'Resume Processing' in the toolbar"
+            "Completed loading images and created file structure. Click on 'Proceed to next project' in the toolbar to continue with the next project or Click .")
 
-def main():
-    # Access arguments
-    script_path = sys.argv[0]
-    arguments = sys.argv[1:]
-    
-    # Process arguments
-    for i in range(0, len(arguments), 2):
-        key = arguments[i]
-        value = arguments[i + 1]
-        print(f"{key}: {value}")
+    def main():
+        # Access arguments
+        script_path = sys.argv[0]
+        arguments = sys.argv[1:]
+        
+        # Process arguments
+        for i in range(0, len(arguments), 2):
+            key = arguments[i]
+            value = arguments[i + 1]
+            print(f"{key}: {value}")
 
-if __name__ == "__main__":
-    main()
+    if __name__ == "__main__":
+        main() """
 

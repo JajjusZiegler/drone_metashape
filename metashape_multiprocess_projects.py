@@ -111,6 +111,7 @@ use_dem = True
 GEOG_COORD = collections.namedtuple('Geog_CS', ['lat_decdeg', 'lon_decdeg', 'elliph'])
 
 SOURCE_CRS = Metashape.CoordinateSystem("EPSG::4326")  # WGS84
+target_crs = Metashape.CoordinateSystem("EPSG::2056")
 
 CONST_a = 6378137  # Semi major axis
 CONST_inv_f = 298.257223563  # Inverse flattening 1/f WGS84 ellipsoid
@@ -262,44 +263,46 @@ def proc_rgb():
     proj_file = doc.path
     blockshift_p1 = False
 
-    if args.drtk is not None:
-        blockshift_p1 = True
-        DRTK_TXT_FILE = args.drtk
-        print("P1 blockshift set")
+    # If DRTK file is provided, blockshift P1 cameras
+    # if args.drtk is not None:
+    #     blockshift_p1 = True
+    #     DRTK_TXT_FILE = args.drtk
+    #     print("P1 blockshift set")
 
-        # read from txt/csv cartesian for RTK initial (line 1) and AUSPOS coords (line 2)
-        with open(DRTK_TXT_FILE, 'r') as file:
-            line = file.readline()
-            split_line = line.split(',')
-            drtk_field = cartesian_to_geog(float(split_line[0]), float(split_line[1]), float(split_line[2]))
-            line = file.readline()
-            split_line = line.split(',')
-            drtk_auspos = cartesian_to_geog(float(split_line[0]), float(split_line[1]), float(split_line[2]))
+    #     # read from txt/csv cartesian for RTK initial (line 1) and AUSPOS coords (line 2)
+    #     with open(DRTK_TXT_FILE, 'r') as file:
+    #         line = file.readline()
+    #         split_line = line.split(',')
+    #         drtk_field = cartesian_to_geog(float(split_line[0]), float(split_line[1]), float(split_line[2]))
+    #         line = file.readline()
+    #         split_line = line.split(',')
+    #         drtk_auspos = cartesian_to_geog(float(split_line[0]), float(split_line[1]), float(split_line[2]))
 
-        # calc difference
-        diff_lat = round((drtk_auspos.lat_decdeg - drtk_field.lat_decdeg), 6)
-        diff_lon = round((drtk_auspos.lon_decdeg - drtk_field.lon_decdeg), 6)
-        diff_elliph = round((drtk_auspos.elliph - drtk_field.elliph), 6)
-        P1_shift = Metashape.Vector((diff_lon, diff_lat, diff_elliph))
+    #     # calc difference
+    #     diff_lat = round((drtk_auspos.lat_decdeg - drtk_field.lat_decdeg), 6)
+    #     diff_lon = round((drtk_auspos.lon_decdeg - drtk_field.lon_decdeg), 6)
+    #     diff_elliph = round((drtk_auspos.elliph - drtk_field.elliph), 6)
+    #     P1_shift = Metashape.Vector((diff_lon, diff_lat, diff_elliph))
 
-        print("Shifting P1 cameras by: " + str(P1_shift))
+    #     print("Shifting P1 cameras by: " + str(P1_shift))
 
-        # shift coordinates in the chunk
-        for camera in chunk.cameras:
-            if not camera.label == camera.master.label:
-                continue
-            if not camera.reference.location:
-                continue
-            else:
-                camera.reference.location = camera.reference.location + P1_shift
+    #     # shift coordinates in the chunk
+    #     for camera in chunk.cameras:
+    #         if not camera.label == camera.master.label:
+    #             continue
+    #         if not camera.reference.location:
+    #             continue
+    #         else:
+    #             camera.reference.location = camera.reference.location + P1_shift
 
     # Convert to projected coordinate system
-    target_crs = Metashape.CoordinateSystem("EPSG::" + args.crs)
-    for camera in chunk.cameras:
-        if not camera.reference.location:
-            continue
-        camera.reference.location = Metashape.CoordinateSystem.transform(camera.reference.location, SOURCE_CRS,
-                                                                         target_crs)
+    global target_crs
+    if chunk.crs != target_crs:
+        print("Converting P1 coordinates to target CRS")
+        for camera in chunk.cameras:
+            if not camera.reference.location:
+                continue
+            camera.reference.location = Metashape.CoordinateSystem.transform(camera.reference.location, SOURCE_CRS, target_crs)
 
     chunk.crs = target_crs
 
@@ -350,6 +353,7 @@ def proc_rgb():
     # Quality:  High, Reference Preselection: Source
     chunk.matchPhotos(downscale= quality1, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
+    doc.save()
     chunk.alignCameras()
     doc.save()
 
@@ -430,7 +434,7 @@ def proc_rgb():
             chunk.buildDem(source_data=Metashape.DenseCloudData,resolution = dem_res_xy )
         doc.save()
 
-        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_" + str(dem_res_xy).split('.')[1] + ".tif")    
+        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_" + str(float(dem_res_xy)).split('.')[1] + ".tif")    
         chunk.exportRaster(path=dem_file, source_data=Metashape.ElevationData, image_format=Metashape.ImageFormatTIFF, image_compression=compression)#include test variable for debugging:
 
     test = args.test #default is False 
@@ -460,7 +464,7 @@ def proc_rgb():
 
             # file naming format: <projname>_rgb_ortho_<res_in_m>.tif
             ortho_file = dir_path / (
-                    Path(proj_file).stem + "_rgb_ortho_" + str(res_xy).split('.')[1] + ".tif")
+                    Path(proj_file).stem + "_rgb_ortho_" + str(float(res_xy)).split('.')[1] + ".tif")
 
 
             chunk.exportRaster(path=str(ortho_file), resolution_x=res_xy, resolution_y=res_xy,
@@ -481,7 +485,7 @@ def proc_rgb():
    
 
 
-def proc_multispec():
+def proc_multispec(args,dict_chunks):
     """
     Author: Poornima Sivanandam
     Arguments: None
@@ -504,7 +508,7 @@ def proc_multispec():
 
     chunk = doc.findChunk(dict_chunks[CHUNK_MULTISPEC])
 
-    target_crs = Metashape.CoordinateSystem("EPSG::" + args.crs)
+    target_crs = Metashape.CoordinateSystem("EPSG::" + "2056")
 
     # Get image suffix of master camera
     camera = chunk.cameras[0]
@@ -685,7 +689,7 @@ def proc_multispec():
 
     if use_dem:
         dem_res_xy = 0.01  # Define the resolution for DEM
-        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_" + str(dem_res_xy).split('.')[1] + ".tif")
+        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_" + str(float(dem_res_xy)).split('.')[1] + ".tif")
         chunk.importRaster(path=dem_file, crs=target_crs, format=Metashape.ImageFormatTIFF)
 
         print("Build orthomosaic")
@@ -709,7 +713,7 @@ def proc_multispec():
 
         # file naming format: <projname>_multispec_ortho_<res_in_m>.tif
         ortho_file = dir_path / (
-                Path(proj_file).stem + "_" + "multispec_ortho_" + str(res_xy).split('.')[1] + ".tif")
+                Path(proj_file).stem + "_" + "multispec_ortho_" + str(float(res_xy)).split('.')[1] + ".tif")
 
         compression = Metashape.ImageCompression()
         compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW  # default on Metashape
@@ -734,7 +738,7 @@ def proc_multispec():
 
 
 # Write arguments to CSV file
-def write_arguments_to_csv():
+def write_arguments_to_csv(args, proj_file):
     global BASE_DIR
     csv_file = os.path.join(BASE_DIR, "arguments_log.csv")
     headers = ["proj_path"] + [arg for arg in vars(args).keys()]
@@ -762,8 +766,7 @@ def write_arguments_to_csv():
 # Resume processing
 def resume_proc():
     # Process RGB chunk if multionly is not set
-    if not args.multionly:
-        proc_rgb()
+    proc_rgb()
     # Process multispec chunk
     proc_multispec()
     print("End of script")
@@ -772,7 +775,11 @@ def resume_proc():
 def proceed_to_next_project():
     # Function implementation
     pass
-
+# Function to filter out empty keys from the CSV row
+#def filter_empty_keys(row):
+#    return {k: v for v in row.items() if k and v}
+def filter_empty_keys(row):
+    return {k: (v if v else None) for k, v in row.items()}
 ############################################
 ##  Main code
 ############################################
@@ -1003,178 +1010,194 @@ def main():
     parser = argparse.ArgumentParser(description='Run metashape_multiprocess_projects.py with arguments from a CSV file')
     parser.add_argument('-csv', help='Path to the CSV file containing the arguments', required=True)
     parser.add_argument('-phase', help='Phase to run: "create" for project creation and loading images, "process" for processing phase', required=True)
-    args = parser.parse_args()
+    parser.add_argument('-test', help='Enable test mode for faster processing')
+    csv_args = parser.parse_args()
 
     # Read arguments from CSV file
-    with open(args.csv, mode='r') as file:
+    with open(csv_args.csv, mode='r') as file:
         csv_reader = csv.DictReader(file)
         for row in csv_reader:
+            global args
+            #row = filter_empty_keys(row)
+            # Create a new Namespace object for each row
+            args = argparse.Namespace()
             for key, value in row.items():
                 setattr(args, key, value)
 
-    global MRK_PATH, MICASENSE_PATH
-    global doc
+            print(vars(args))
 
-    # Metashape project
-    if args.phase == "process":
-        doc = Metashape.Document()
-        proj_file = args.proj_path
-        doc.open(proj_file, ignore_lock=True) # Open the document in editable mode
-    elif args.phase == "create":
-        site = args.site
-        date = args.date
-        proj_file = os.path.join(BASE_DIR, site, date, f"{site}_{date}_metashape.psx")
-        if not os.path.exists(proj_file):
-            doc.save(proj_file)
-        print(f"Metashape project will be saved as {proj_file}")
-        doc.open(proj_file, ignore_lock=True)
-        doc.save(proj_file)
+        
+            global MRK_PATH, MICASENSE_PATH,dict_chunks, quality1, quality2, quality3, P1_CAM_CSV, MICASENSE_CAM_CSV, MS_GIMBAL2_OFFSET, cam_model
+            global doc
 
-    if doc is None:
-        print("Error: Metashape document object is not initialized.")
-        return
+            # Metashape project
+            if csv_args.phase == "process":
+                doc = Metashape.Document()
+                proj_file = args.proj_path
+                doc.open(proj_file, ignore_lock=True) # Open the document in editable mode
+            elif csv_args.phase == "create":
+                site = args.site
+                date = args.date
+                proj_file = os.path.join(BASE_DIR, site, date, f"{site}_{date}_metashape.psx")
+                if not os.path.exists(proj_file):
+                    doc = Metashape.Document()
+                    doc.save(proj_file)
+                print(f"Metashape project will be saved as {proj_file}")
+                doc = Metashape.Document()
+                doc.open(proj_file, ignore_lock=True)
+                doc.save(proj_file)
 
-    if args.rgb:
-        MRK_PATH = args.rgb
-    else:
-        # Default is relative to project location: ../rgb/level0_raw/
-        MRK_PATH = Path(proj_file).parents[1] / "rgb/level0_raw"
-        if not MRK_PATH.is_dir():
-            sys.exit("%s directory does not exist. Check and input paths using -rgb " % str(MRK_PATH))
-        else:
-            MRK_PATH = str(MRK_PATH)
+            if doc is None:
+                print("Error: Metashape document object is not initialized.")
+                return
 
-    if args.multispec:
-        MICASENSE_PATH = args.multispec
-    else:
-        # Default is relative to project location: ../multispec/level0_raw/
-        MICASENSE_PATH = Path(proj_file).parents[1] / "multispec/level0_raw"
-        if not MICASENSE_PATH.is_dir():
-            sys.exit("%s directory does not exist. Check and input paths using -multispec " % str(MICASENSE_PATH))
-        else:
-            MICASENSE_PATH = str(MICASENSE_PATH)
+            if args.rgb:
+                MRK_PATH = args.rgb
+            else:
+                # Default is relative to project location: ../rgb/level0_raw/
+                MRK_PATH = Path(proj_file).parents[1] / "rgb/level0_raw"
+                if not MRK_PATH.is_dir():
+                    sys.exit("%s directory does not exist. Check and input paths using -rgb " % str(MRK_PATH))
+                else:
+                    MRK_PATH = str(MRK_PATH)
 
-    if args.drtk is not None:
-        DRTK_TXT_FILE = args.drtk
-        if not Path(DRTK_TXT_FILE).is_file():
-            sys.exit("%s file does not exist. Check and input correct path using -drtk option" % str(DRTK_TXT_FILE))
+            if args.multispec:
+                MICASENSE_PATH = args.multispec
+            else:
+                # Default is relative to project location: ../multispec/level0_raw/
+                MICASENSE_PATH = Path(proj_file).parents[1] / "multispec/level0_raw"
+                if not MICASENSE_PATH.is_dir():
+                    sys.exit("%s directory does not exist. Check and input paths using -multispec " % str(MICASENSE_PATH))
+                else:
+                    MICASENSE_PATH = str(MICASENSE_PATH)
 
-    if args.smooth not in DICT_SMOOTH_STRENGTH:
-        sys.exit("Value for -smooth must be one of low, medium or high.")
+            #if args.drtk is not None:
+            #    DRTK_TXT_FILE = args.drtk
+            #   if not Path(DRTK_TXT_FILE).is_file():
+            #        sys.exit("%s file does not exist. Check and input correct path using -drtk option" % str(DRTK_TXT_FILE))
 
-    # Set quality values for the downscale value in RGB and Multispec for testing
-    if args.test:
-        quality1 = 4 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-        quality2 = 8 #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
-        quality3 = 4 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-        print("Test mode enabled: quality1 set to 4, quality2 set to 8, quality3 set to 4")
-    else:
-        quality1 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-        quality2 = 4  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
-        quality3 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-        print("Default mode: quality1 set to 2, quality2 set to 2, quality3 set to 2")
+            if args.smooth not in DICT_SMOOTH_STRENGTH:
+                sys.exit("Value for -smooth must be one of low, medium or high.")
 
-    # Export blockshifted P1 positions. Not used in script. Useful for debug or to restart parts of script following any issues.
-    P1_CAM_CSV = Path(proj_file).parent / "dbg_shifted_p1_pos.csv"
-    # By default save the CSV with updated MicaSense positions in the MicaSense folder. CSV used within script.
-    MICASENSE_CAM_CSV = Path(proj_file).parent / "interpolated_micasense_pos.csv"
-    
-    # Check that lever-arm offsets are non-zero:
-    # As this script is for RGB and MS images captured simultaneously on dual gimbal, lever-arm offsets cannot be 0.
-    #  Zenmuse P1
-    if P1_GIMBAL1_OFFSET == 0:
-        err_msg = "Lever-arm offset for P1 in dual gimbal mode cannot be 0. Update offset_dict and rerun_script."
-        Metashape.app.messageBox(err_msg)
+            # Set quality values for the downscale value in RGB and Multispec for testing
+            if csv_args.test:
+                quality1 = 4 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+                quality2 = 8 #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
+                quality3 = 2 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+                print("Test mode enabled: quality1 set to 4, quality2 set to 8, quality3 set to 4")
+            else:
+                quality1 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+                quality2 = 4  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
+                quality3 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+                print("Default mode: quality1 set to 2, quality2 set to 2, quality3 set to 2")
 
-    # MicaSense: get Camera Model from one of the images to check the lever-arm offsets for the relevant model
-    micasense_images = find_files(MICASENSE_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
-    sample_img = open(micasense_images[0], 'rb')
-    exif_tags = exifread.process_file(sample_img)
-    cam_model = str(exif_tags.get('Image Model'))
+            # Export blockshifted P1 positions. Not used in script. Useful for debug or to restart parts of script following any issues.
+            P1_CAM_CSV = Path(proj_file).parent / "dbg_shifted_p1_pos.csv"
+            # By default save the CSV with updated MicaSense positions in the MicaSense folder. CSV used within script.
+            MICASENSE_CAM_CSV = Path(proj_file).parent / "interpolated_micasense_pos.csv"
+            
+            # Check that lever-arm offsets are non-zero:
+            # As this script is for RGB and MS images captured simultaneously on dual gimbal, lever-arm offsets cannot be 0.
+            #  Zenmuse P1
+            if P1_GIMBAL1_OFFSET == 0:
+                err_msg = "Lever-arm offset for P1 in dual gimbal mode cannot be 0. Update offset_dict and rerun_script."
+                Metashape.app.messageBox(err_msg)
 
-    # HARDCODED number of bands.
-    if len(chunk.sensors) >= 10:
-        # Dual sensor (RedEdge-MX Dual: 10, RedEdge-P Dual: 11)
-        # Dual sensor: If offsets are 0, exit with error.
-        if offset_dict[cam_model]['Dual'] == (0, 0, 0):
-            err_msg = "Lever-arm offsets for " + cam_model + " Dual on gimbal 2 cannot be 0. Update offset_dict and rerun script."
-            Metashape.app.messageBox(err_msg)
-        else:
+            # MicaSense: get Camera Model from one of the images to check the lever-arm offsets for the relevant model
+            micasense_images = find_files(MICASENSE_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
+            sample_img = open(micasense_images[0], 'rb')
+            exif_tags = exifread.process_file(sample_img)
+            cam_model = str(exif_tags.get('Image Model'))
+
+            # HARDCODED number of bands.
+            #if len(chunk.sensors) >= 10:
+            #   # Dual sensor (RedEdge-MX Dual: 10, RedEdge-P Dual: 11)
+            #    # Dual sensor: If offsets are 0, exit with error.
+            #    if offset_dict[cam_model]['Dual'] == (0, 0, 0):
+            #        err_msg = "Lever-arm offsets for " + cam_model + " Dual on gimbal 2 cannot be 0. Update offset_dict and rerun script."
+            #        Metashape.app.messageBox(err_msg)
+            #    else:
             MS_GIMBAL2_OFFSET = offset_dict[cam_model]['Dual']
-    else:
-        # RedEdge-MX or RedEdge-P (5-band or 6-band respectively): If offsets are 0, exit with error.
-        if offset_dict[cam_model]['Red'] == (0, 0, 0):
-            err_msg = "Lever-arm offsets for " + cam_model + " Red on gimbal 2 cannot be 0. Update offset_dict and rerun script."
-            Metashape.app.messageBox(err_msg)
-        else:
+            #else:
+            #    # RedEdge-MX or RedEdge-P (5-band or 6-band respectively): If offsets are 0, exit with error.
+            #    if offset_dict[cam_model]['Red'] == (0, 0, 0):
+            #        err_msg = "Lever-arm offsets for " + cam_model + " Red on gimbal 2 cannot be 0. Update offset_dict and rerun script."
+            #        Metashape.app.messageBox(err_msg)
+            #    else:
             MS_GIMBAL2_OFFSET = offset_dict[cam_model]['Red']
 
-        # Add images and create project
-    if args.phase == "create":
-        # Check if RGB and multispec chunks already exist and have images
-        chunk_labels = [CHUNK_RGB, CHUNK_MULTISPEC]
-        chunks_exist = {label: False for label in chunk_labels}
-    
-        for chunk in doc.chunks:
-            if chunk.label in chunk_labels:
-                if len(chunk.cameras) > 0:
-                        chunks_exist[chunk.label] = True
-                if len(chunk.cameras) > 0:
-                    chunks_exist[chunk.label] = True
-                if len(chunk.cameras) > 0:
-                    chunks_exist[chunk.label] = True
+                # Add images and create project
+            if csv_args.phase == "create":
+                # Check if RGB and multispec chunks already exist and have images
+                chunk_labels = [CHUNK_RGB, CHUNK_MULTISPEC]
+                chunks_exist = {label: False for label in chunk_labels}
+            
+                for chunk in doc.chunks:
+                    if chunk.label in chunk_labels:
+                        if len(chunk.cameras) > 0:
+                                chunks_exist[chunk.label] = True
+                        if len(chunk.cameras) > 0:
+                            chunks_exist[chunk.label] = True
+                        if len(chunk.cameras) > 0:
+                            chunks_exist[chunk.label] = True
 
-        # Skip loading images if both chunks exist and have images
-        if chunks_exist[CHUNK_RGB] and chunks_exist[CHUNK_MULTISPEC]:
-            print("RGB and multispec chunks already exist and have images. Skipping image loading phase.")
-        else:
-            # Add images and create project
-            if not chunks_exist[CHUNK_RGB]:
-                p1_images = find_files(MRK_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
-                chunk = doc.addChunk()
-                chunk.label = CHUNK_RGB
-                chunk.addPhotos(p1_images)
+                # Skip loading images if both chunks exist and have images
+                if chunks_exist[CHUNK_RGB] and chunks_exist[CHUNK_MULTISPEC]:
+                    print("RGB and multispec chunks already exist and have images. Skipping image loading phase.")
+                else:
+                    # Add images and create project
+                    if not chunks_exist[CHUNK_RGB]:
+                        p1_images = find_files(MRK_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
+                        chunk = doc.addChunk()
+                        chunk.label = CHUNK_RGB
+                        chunk.addPhotos(p1_images)
 
-                # Check that chunk is not empty and images are in default WGS84 CRS
-                if len(chunk.cameras) == 0:
-                    sys.exit("Chunk rgb empty")
-                if "EPSG::4326" not in str(chunk.crs):
-                    sys.exit("Chunk rgb: script expects images loaded to be in CRS WGS84 EPSG::4326")
+                        # Check that chunk is not empty and images are in default WGS84 CRS
+                        if len(chunk.cameras) == 0:
+                            sys.exit("Chunk rgb empty")
+                        if "EPSG::4326" not in str(chunk.crs):
+                            sys.exit("Chunk rgb: script expects images loaded to be in CRS WGS84 EPSG::4326")
 
-            if not chunks_exist[CHUNK_MULTISPEC]:
-                micasense_images = find_files(MICASENSE_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
-                chunk = doc.addChunk()
-                chunk.label = CHUNK_MULTISPEC
-                chunk.addPhotos(micasense_images)
+                    if not chunks_exist[CHUNK_MULTISPEC]:
+                        micasense_images = find_files(MICASENSE_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
+                        chunk = doc.addChunk()
+                        chunk.label = CHUNK_MULTISPEC
+                        chunk.addPhotos(micasense_images)
 
-                # Check that chunk is not empty and images are in default WGS84 CRS
-                if len(chunk.cameras) == 0:
-                    sys.exit("Multispec chunk empty")
-                if "EPSG::4326" not in str(chunk.crs):
-                    sys.exit("Multispec chunk: script expects images loaded to be in CRS WGS84 EPSG::4326")
-            # Used to find chunks in proc_*
-            check_chunk_list = [CHUNK_RGB, CHUNK_MULTISPEC]
-            dict_chunks = {}
-            for get_chunk in doc.chunks:
-                dict_chunks.update({get_chunk.label: get_chunk.key})
+                        # Check that chunk is not empty and images are in default WGS84 CRS
+                        if len(chunk.cameras) == 0:
+                            sys.exit("Multispec chunk empty")
+                        if "EPSG::4326" not in str(chunk.crs):
+                            sys.exit("Multispec chunk: script expects images loaded to be in CRS WGS84 EPSG::4326")
+                    doc.save()
+                    
+                    # Used to find chunks in proc_*
+                    check_chunk_list = [CHUNK_RGB, CHUNK_MULTISPEC]
+                    dict_chunks = {}
+                    for get_chunk in doc.chunks:
+                        dict_chunks.update({get_chunk.label: get_chunk.key})
 
-            # Delete 'Chunk 1' that is created by default.
-            if 'Chunk 1' in dict_chunks:
-                chunk = doc.findChunk(dict_chunks['Chunk 1'])
-                doc.remove(chunk)
-                doc.save()
-        
-            write_arguments_to_csv()  # Open the document in editable mode
-            doc.save()
-            print("Project creation and image loading completed.")
-    
-    # Process the project
-    elif args.phase == "process":
-        # Processing phase
-        resume_proc()
-        print("Processing phase completed.")
-    else:
-        print("Invalid phase argument. Use 'create' or 'process'.")
+                    # Delete 'Chunk 1' that is created by default.
+                    if 'Chunk 1' in dict_chunks:
+                        chunk = doc.findChunk(dict_chunks['Chunk 1'])
+                        doc.remove(chunk)
+                        doc.save()
+                
+                    #write_arguments_to_csv()  # Open the document in editable mode
+                    doc.save()
+                    print("Project creation and image loading completed.")
+            
+            # Process the project
+            elif csv_args.phase == "process":
+                check_chunk_list = [CHUNK_RGB, CHUNK_MULTISPEC]
+                dict_chunks = {}
+                for get_chunk in doc.chunks:
+                    dict_chunks.update({get_chunk.label: get_chunk.key})
+                # Processing phase
+                resume_proc()
+                print("Processing phase completed.")
+            else:
+                print("Invalid phase argument. Use 'create' or 'process'.")
 
 if __name__ == "__main__":
     main()
