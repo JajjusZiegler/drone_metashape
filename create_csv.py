@@ -1,54 +1,84 @@
 import pandas as pd
 import csv
+import os
+import logging
+from pathlib import Path
 
-def read_second_sheet(filepath):
-    return pd.read_excel(filepath, sheet_name=1)
+# Configure logging
+logging.basicConfig(filename='csv_creation.log', level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Example usage
-filepath = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx"
-df = read_second_sheet(filepath)
+def read_excel_sheet(filepath: str, sheet_index: int = 1) -> pd.DataFrame:
+    """Reads the specified sheet from an Excel file."""
+    if not os.path.exists(filepath):
+        logging.error(f"File not found: {filepath}")
+        raise FileNotFoundError(f"Excel file not found: {filepath}")
 
-# Remove triple quotes from the entire DataFrame
-df = df.applymap(lambda x: x.replace('"""', '') if isinstance(x, str) else x)
+    try:
+        df = pd.read_excel(filepath, sheet_name=sheet_index)
+        logging.info(f"Successfully read sheet {sheet_index} from {filepath}")
+        return df
+    except Exception as e:
+        logging.error(f"Error reading Excel file: {e}")
+        raise
 
-print(df.columns)
+def clean_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Cleans the DataFrame and splits it into RGB+Multispec and Multispec-only."""
+    required_columns = {'date', 'site', 'rgb', 'multispec', 'crs', 'sunsens'}
+    
+    if not required_columns.issubset(df.columns):
+        missing_cols = required_columns - set(df.columns)
+        logging.error(f"Missing required columns: {missing_cols}")
+        raise ValueError(f"Missing required columns in Excel sheet: {missing_cols}")
 
-# Select specific columns
-selected_columns = ['date', 'site', 'rgb', 'multispec', 'crs', 'sunsens']
-df_selected = df[selected_columns].copy()
+    # Remove triple quotes globally
+    df = df.applymap(lambda x: x.replace('"""', '') if isinstance(x, str) else x)
 
-# Add quotation marks if missing
-df_selected['rgb'] = df_selected['rgb'].apply(lambda x: f'"{x}"' if isinstance(x, str) and not x.startswith('"') and not x.endswith('"') else x)
-df_selected['multispec'] = df_selected['multispec'].apply(lambda x: f'"{x}"' if isinstance(x, str) and not x.startswith('"') and not x.endswith('"') else x)
+    # Select relevant columns
+    df_selected = df[['date', 'site', 'rgb', 'multispec', 'crs', 'sunsens']].copy()
 
-# Filter out rows with NaN in 'multispec'
-df_filtered = df_selected.dropna(subset=['multispec'])
+    # Ensure paths are quoted
+    for col in ['rgb', 'multispec']:
+        df_selected[col] = df_selected[col].apply(lambda x: f'"{x}"' if isinstance(x, str) and not x.startswith('"') else x)
 
-# Handle rows where 'rgb' is NaN
-df_multispectral = df_filtered[df_filtered['rgb'].isna()].copy()
-df_multispectral.drop(columns=['rgb'], inplace=True)
+    # Convert date column to YYYYMMDD format
+    df_selected['date'] = pd.to_datetime(df_selected['date'], errors='coerce').dt.strftime('%Y%m%d')
 
-# Filter out rows with NaN in 'multispec'
-df_filtered = df_filtered.dropna(subset=['rgb'])
+    # Remove rows where `multispec` is empty
+    df_selected = df_selected.dropna(subset=['multispec'])
+    df_selected = df_selected[df_selected['multispec'].str.strip() != '']
 
-# Convert 'date' column to YYYYMMDD format
-df_filtered['date'] = pd.to_datetime(df_filtered['date']).dt.strftime('%Y%m%d')
-df_multispectral['date'] = pd.to_datetime(df_multispectral['date']).dt.strftime('%Y%m%d')
+    # Split data into two DataFrames
+    df_rgb_multi = df_selected.dropna(subset=['rgb'])  # Rows with both RGB and multispec
+    df_multispec_only = df_selected[df_selected['rgb'].isna()].drop(columns=['rgb'])  # Rows with only multispec
 
-# Ensure triple quotes are removed in the final output
-df_filtered = df_filtered.applymap(lambda x: x.replace('"""', '') if isinstance(x, str) else x)
-df_multispectral = df_multispectral.applymap(lambda x: x.replace('"""', '') if isinstance(x, str) else x)
+    return df_rgb_multi, df_multispec_only
 
-print(df_filtered['rgb'])
-print(df_filtered['multispec'])
+def save_to_csv(df: pd.DataFrame, output_path: str):
+    """Saves a DataFrame to a CSV file."""
+    output_dir = Path(output_path).parent
+    output_dir.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
 
-# Define the output CSV file paths
-output_csv_path = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\RGBandMulti_data.csv"
-multispectral_csv_path = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\multispectral_data.csv"
+    df.to_csv(output_path, index=False, quoting=csv.QUOTE_NONE, escapechar='\\')
+    logging.info(f"CSV file saved at: {output_path}")
 
-# Save the filtered rows to CSV files
-df_filtered.to_csv(output_csv_path, index=False, quoting=csv.QUOTE_NONE, escapechar='\\')
-df_multispectral.to_csv(multispectral_csv_path, index=False, quoting=csv.QUOTE_NONE, escapechar='\\')
+if __name__ == "__main__":
+    # Define file paths
+    excel_filepath = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test.xlsx"
+    
+    # Generate output file paths based on the input file name
+    base_name = os.path.splitext(os.path.basename(excel_filepath))[0]
+    output_dir = os.path.dirname(excel_filepath)
+    output_rgb_multi_csv = os.path.join(output_dir, f"{base_name}_RGBandMulti_data.csv")
+    output_multispec_csv = os.path.join(output_dir, f"{base_name}_multispectral_data.csv")
 
-print(f"CSV file created at: {output_csv_path}")
-print(f"Multispectral CSV file created at: {multispectral_csv_path}")
+    try:
+        df = read_excel_sheet(excel_filepath)
+        df_rgb_multi, df_multispec_only = clean_dataframe(df)
+
+        save_to_csv(df_rgb_multi, output_rgb_multi_csv)
+        save_to_csv(df_multispec_only, output_multispec_csv)
+
+    except Exception as e:
+        logging.error(f"Script failed: {e}")
+        print(f"Error: {e}")

@@ -80,8 +80,6 @@ from upd_micasense_pos import ret_micasense_pos
 import importlib
 import upd_micasense_pos
 import csv
-import logging
-from datetime import datetime
 
 
 importlib.reload(upd_micasense_pos)
@@ -141,34 +139,6 @@ offset_dict['RedEdge-P']['Dual'] = (0,0,0)
 ###############################################################################
 # Function definitions
 ###############################################################################
-def setup_logging(project_path):
-    """Configure logging to file and console"""
-    log_dir = Path(project_path).parent / "logs"
-    log_dir.mkdir(exist_ok=True)
-    
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    
-    # Clear existing handlers
-    if logger.hasHandlers():
-        logger.handlers.clear()
-    
-    # File handler
-    log_file = log_dir / f"{Path(project_path).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-    file_handler = logging.FileHandler(log_file)
-    file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(file_formatter)
-    
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_formatter = logging.Formatter('%(levelname)s - %(message)s')
-    console_handler.setFormatter(console_formatter)
-    
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-    
-    return log_file
-
 def cartesian_to_geog(X, Y, Z):
     """
     Author: Poornima Sivanandam
@@ -375,9 +345,8 @@ def proc_rgb():
     #
     # Optimise Cameras
     #
-    # Optimize camera alignment by adjusting intrinsic parameters
-    print("Optimizing camera alignment...")
-    chunk.optimizeCameras(fit_f=True, fit_cx=True, fit_cy=True, fit_b1=True, fit_b2=True, adaptive_fitting=False)
+    print("Optimise alignment")
+    chunk.optimizeCameras()
     doc.save()
 
     #
@@ -487,11 +456,6 @@ def proc_rgb():
                                image_format=Metashape.ImageFormatTIFF,
                                save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
             print("Exported orthomosaic " + str(ortho_file))
-
-            logging.info(f"Exported RGB orthomosaic: {ortho_file}")
-            print(f"OUTPUT_ORTHO_RGB: {ortho_file}")
-
-
         else:
             print("Skipping orthomosaic building and exporting due to test mode.")
 
@@ -501,9 +465,6 @@ def proc_rgb():
         print(f"Exporting processing report to {report_path}...")
         chunk.exportReport(path = str(report_path))
         doc.save()
-
-        logging.info(f"Exported RGB report: {report_path}")
-        print(f"OUTPUT_REPORT_RGB: {report_path}")
 
         print("RGB chunk processing complete!")
    
@@ -671,7 +632,7 @@ def proc_multispec():
     # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8 # to be set below
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale= quality3 , generic_preselection=True, reference_preselection=True,
+    chunk.matchPhotos(downscale= quality3 , generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource, tiepoint_limit= 10000)
     doc.save()
     print("Aligning cameras")
@@ -686,9 +647,11 @@ def proc_multispec():
     f.removePoints(threshold)
     doc.save()
 
-    # Optimize camera alignment by adjusting intrinsic parameters
-    print("Optimizing camera alignment...")
-    chunk.optimizeCameras(fit_f=True, fit_cx=True, fit_cy=True, fit_b1=True, fit_b2=True, adaptive_fitting=False)
+    #
+    # Optimise Cameras
+    #
+    print("Optimise alignment")
+    chunk.optimizeCameras()
     doc.save()
 
     # copy bounding box from rgb chunk
@@ -748,21 +711,12 @@ def proc_multispec():
                            save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
         print("Exported orthomosaic: " + str(ortho_file))
 
-        logging.info(f"Exported multispec orthomosaic: {ortho_file}")
-        print(f"OUTPUT_ORTHO_MS: {ortho_file}")
-
     # Export the processing report
     report_path = dir_path / (
                 Path(proj_file).stem + "_multispec_report.pdf")
     print(f"Exporting processing report to {report_path}...")
     chunk.exportReport(path = str(report_path))
-
     doc.save()
-    
-    # write to logfile
-
-    logging.info(f"Exported multispec report: {report_path}")
-    print(f"OUTPUT_REPORT_MS: {report_path}")
         
     print("Multispec chunk processing complete!")
 
@@ -811,8 +765,6 @@ def resume_proc():
 ############################################
 print("Script start")
 
-
-
 # Parse arguments and initialise variables
 parser = argparse.ArgumentParser(
     description='Update camera positions in P1 and/or MicaSense chunks in Metashape project')
@@ -833,11 +785,6 @@ parser.add_argument('-multionly', help='process multispec chunk only', action='s
 
 global args
 args = parser.parse_args()
-
-# Initialize logging first
-setup_logging(args.proj_path)
-logging.info(f"Starting processing for project: {args.proj_path}")
-
 global MRK_PATH, MICASENSE_PATH
 
 global doc
@@ -930,16 +877,11 @@ dict_chunks = {}
 for get_chunk in doc.chunks:
     dict_chunks.update({get_chunk.label: get_chunk.key})
 
+# VERY IMPORTANT THE ACTUAL PROCESSING HAPPENS HERE
+resume_proc()
 
-try:
-    # VERY IMPORTANT THE ACTUAL PROCESSING HAPPENS HERE
-    resume_proc()
-    logging.info("Processing completed successfully")
-except Exception as e:
-    logging.error(f"Processing failed: {str(e)}", exc_info=True)
-    raise  # Re-raise exception to trigger error in main script
-finally:
-    doc.save()
-    logging.info("Project saved")
+# # Stop script here. User to click 'Resume Processing' once following steps are complete.
+# # see resume_proc() for processing steps.
+doc.save()
 print("DONE WITH PROJ:", proj_file)
 

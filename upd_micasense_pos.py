@@ -314,32 +314,44 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
                 upd_pos1 = P1_pos[a-1]
                 upd_pos2 = P1_pos[a]
     
-        time_delta = 0
-        if (time2-time1) != 0:
-            time_delta = (camera_time_sec - time1)/(time2 - time1)
-      
-        upd_micasense_pos = [0.0, 0.0, 0.0]
-        upd_micasense_pos[0] = upd_pos1[0] + time_delta * (upd_pos2[0] - upd_pos1[0])
-        upd_micasense_pos[1] = upd_pos1[1] + time_delta * (upd_pos2[1] - upd_pos1[1])
-        upd_micasense_pos[2] = upd_pos1[2] + time_delta * (upd_pos2[2] - upd_pos1[2])
-    
-        path_image_name = filelist[count]
-        image_name = path_image_name.split("\\")[-1]
-        
-        pos_index = mica_events.index(m_cam_time)
-        
-        # For images captured within P1 times, write updated Easting, Northing, Ellipsoidal height to CSV
-        if(upd_micasense_pos[2] != 0):
-            rec = ("%s, %10.4f, %10.4f, %10.4f\n" % \
-                    (image_name, upd_micasense_pos[0], upd_micasense_pos[1], upd_micasense_pos[2]))
-        else:
-            # For MicaSense images captured outisde P1 times, just save original Easting, Northing. BUT set ellipsoidal height to 0 
-            # to filter and delete these cameras
-            rec = ("%s, %10.4f, %10.4f, %10.4f\n" % \
-                    (image_name, mica_pos[pos_index][0], mica_pos[pos_index][1], upd_micasense_pos[2]))
-            
-        out_frame.write(rec) 
-        count = count + 1
+            # Compute time_delta only if time2 and time1 are different
+            time_delta = 0.0
+
+            if (time2 - time1) != 0:
+                time_delta = (camera_time_sec - time1) / (time2 - time1)
+
+            # Interpolate Easting (X) and Northing (Y) from P1 positions:
+            interp_E = upd_pos1[0] + time_delta * (upd_pos2[0] - upd_pos1[0])
+            interp_N = upd_pos1[1] + time_delta * (upd_pos2[1] - upd_pos1[1])
+
+            # Interpolate the altitude (Z) from the P1 data:
+            interp_h = upd_pos1[2] + time_delta * (upd_pos2[2] - upd_pos1[2])
+
+            # If needed, you can adjust the altitude to a different vertical datum.
+            # For example, if your P1 altitude is ellipsoidal and you need to convert to MSL,
+            # you can use a geoid model to get the geoid height at (interp_E, interp_N).
+            #
+            # Uncomment and modify the next two lines if you have a function to get the geoid offset:
+            #
+            # geoid_offset = get_geoid_offset(interp_E, interp_N)  # User-defined function: returns the geoid separation at this point.
+            # interp_h = interp_h - geoid_offset  # Adjust the ellipsoidal height to mean sea level (or vice versa)
+
+            # Combine into a new interpolated position vector for the MicaSense image:
+            upd_micasense_pos = [interp_E, interp_N, interp_h]
+
+
+                    # For images captured within P1 times, write updated Easting, Northing, Ellipsoidal height to CSV
+            if(upd_micasense_pos[2] != 0):
+                        rec = ("%s, %10.4f, %10.4f, %10.4f\n" % \
+                                (image_name, upd_micasense_pos[0], upd_micasense_pos[1], upd_micasense_pos[2]))
+            else:
+                        # For MicaSense images captured outisde P1 times, just save original Easting, Northing. BUT set ellipsoidal height to 0 
+                        # to filter and delete these cameras
+                        rec = ("%s, %10.4f, %10.4f, %10.4f\n" % \
+                                (image_name, mica_pos[pos_index][0], mica_pos[pos_index][1], upd_micasense_pos[2]))
+                        
+            out_frame.write(rec) 
+            count = count + 1
         
     # Close the CSV file
     out_frame.close()
