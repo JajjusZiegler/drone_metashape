@@ -101,7 +101,7 @@ if int(found_version[0]) >= 2:
 # Decoide if you want to use model or DEM or for Orthomoasaic
 ###############################################################################
 
-BASE_DIR = "M:/working_package_2/2024_dronecampaign/01_data/dronetest/processing_test"
+BASE_DIR = "M:/working_package_2/2024_dronecampaign/01_data/dronetest/processing_test5"
 
 use_model = False
 use_dem = True
@@ -181,31 +181,15 @@ def find_files(folder, types):
                 photo_list.append(os.path.join(dir, filename))
     return (photo_list)
 
-def copyBoundingBox(from_chunk_label, to_chunk_labels):
+def copyBoundingBox(from_chunk_label, to_chunk_label):
     print("Script started...")
 
-    doc = Metashape.app.document
+    from_chunk = doc.findChunk(dict_chunks[from_chunk_label])
 
-    from_chunk = None
-    for chunk in doc.chunks:
-        if chunk.label == from_chunk_label:
-            from_chunk = chunk
-            break
+    to_chunk = doc.findChunk(dict_chunks[to_chunk_label])
 
-    if not from_chunk:
-        print(f"Chunk with label '{from_chunk_label}' not found.")
-        return
 
-    to_chunks = []
-    for chunk in doc.chunks:
-        if chunk.label in to_chunk_labels:
-            to_chunks.append(chunk)
-
-    if not to_chunks:
-        print("No valid target chunks found.")
-        return
-
-    print("Copying bounding box from chunk '" + from_chunk.label + "' to " + str(len(to_chunks)) + " chunks...")
+    print("Copying bounding box from chunk '" + from_chunk.label + "' to " + to_chunk_label + " chunks...")
 
     T0 = from_chunk.transform.matrix
 
@@ -214,26 +198,23 @@ def copyBoundingBox(from_chunk_label, to_chunk_labels):
     C0 = region.center
     s0 = region.size
 
-    for chunk in to_chunks:
-        if chunk == from_chunk:
-            continue
+    
+    T = from_chunk.transform.matrix.inv() * T0
 
-        T = chunk.transform.matrix.inv() * T0
-
-        R = Metashape.Matrix([[T[0, 0], T[0, 1], T[0, 2]],
+    R = Metashape.Matrix([[T[0, 0], T[0, 1], T[0, 2]],
                               [T[1, 0], T[1, 1], T[1, 2]],
                               [T[2, 0], T[2, 1], T[2, 2]]])
 
-        scale = R.row(0).norm()
-        R = R * (1 / scale)
+    scale = R.row(0).norm()
+    R = R * (1 / scale)
 
-        new_region = Metashape.Region()
-        new_region.rot = R * R0
-        c = T.mulp(C0)
-        new_region.center = c
-        new_region.size = s0 * scale / 1.
+    new_region = Metashape.Region()
+    new_region.rot = R * R0
+    c = T.mulp(C0)
+    new_region.center = c
+    new_region.size = s0 * scale * 1.2 # 20% larger bounding box
 
-        chunk.region = new_region
+    to_chunk.region = new_region
 
 def proc_rgb():
     """
@@ -431,8 +412,10 @@ def proc_rgb():
             chunk.buildDem(source_data=Metashape.DenseCloudData,resolution = dem_res_xy )
         doc.save()
 
-        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_" + str(dem_res_xy).split('.')[1] + ".tif")    
-        chunk.exportRaster(path=dem_file, source_data=Metashape.ElevationData, image_format=Metashape.ImageFormatTIFF, image_compression=compression)#include test variable for debugging:
+        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_01.tif")
+
+        chunk.exportRaster(path=str(dem_file), source_data=Metashape.ElevationData, image_format=Metashape.ImageFormatTIFF, image_compression=compression)
+        #include test variable for debugging:
 
     test = args.test #default is False 
 
@@ -441,7 +424,12 @@ def proc_rgb():
         # Build and export orthomosaic
         #
         print("Build orthomosaic")
-        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
+        if use_model:
+            chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
+        elif use_dem:
+            chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
+        else:
+            print("No valid surface data source specified for orthomosaic building.")
         doc.save()
 
         if chunk.orthomosaic:
@@ -461,7 +449,7 @@ def proc_rgb():
 
             # file naming format: <projname>_rgb_ortho_<res_in_m>.tif
             ortho_file = dir_path / (
-                    Path(proj_file).stem + "_rgb_ortho_" + str(res_xy).split('.')[1] + ".tif")
+                    Path(proj_file).stem + "_rgb_ortho_01.tif")
 
 
             chunk.exportRaster(path=str(ortho_file), resolution_x=res_xy, resolution_y=res_xy,
@@ -517,8 +505,7 @@ def proc_multispec():
 
     #set P1_shift_vec to 0 if multionly is set
     global P1_shift_vec 
-    if args.multionly:
-        P1_shift_vec = np.array([0.0, 0.0, 0.0])
+    P1_shift_vec = np.array([0.0, 0.0, 0.0])
 
     print("Interpolate Micasense position based on P1 with blockshift" + str(P1_shift_vec))
 
@@ -646,10 +633,10 @@ def proc_multispec():
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8 # to be set below
     # Quality:  High, Reference Preselection: Source
     chunk.matchPhotos(downscale= quality3 , generic_preselection=False, reference_preselection=True,
-                      reference_preselection_mode=Metashape.ReferencePreselectionSource)
+                      reference_preselection_mode=Metashape.ReferencePreselectionSource, tiepoint_limit= 10000)
     doc.save()
     print("Aligning cameras")
-    chunk.alignCameras()
+    chunk.alignCameras(adaptive_fitting=True)
     doc.save()
 
     # Gradual selection based on reprojection error
@@ -686,8 +673,8 @@ def proc_multispec():
 
     if use_dem:
         dem_res_xy = 0.01  # Define the resolution for DEM
-        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_" + str(dem_res_xy).replace('.', '') + ".tif")
-        chunk.importRaster(path=dem_file, crs=target_crs, format=Metashape.ImageFormatTIFF)
+        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_01.tif")
+        chunk.importRaster(path=str(dem_file), crs=target_crs, format=Metashape.ImageFormatTIFF)
 
         print("Build orthomosaic")
         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
@@ -763,8 +750,8 @@ def write_arguments_to_csv():
 # Resume processing
 def resume_proc():
     # Process RGB chunk if multionly is not set
-    if not args.multionly:
-        proc_rgb()
+    #if not args.multionly:
+    proc_rgb()
     # Process multispec chunk
     proc_multispec()
     print("End of script")
@@ -781,7 +768,7 @@ print("Script start")
 # Parse arguments and initialise variables
 parser = argparse.ArgumentParser(
     description='Update camera positions in P1 and/or MicaSense chunks in Metashape project')
-parser.add_argument('-proj_path', help='path to Metashape project file')
+parser.add_argument('-proj_path', help='path to Metashape project file', required=True)
 parser.add_argument('-date', help='Date of flight in YYYYMMDD format', required=True)
 parser.add_argument('-site', help='Site name', required=True)
 parser.add_argument('-crs',
@@ -792,9 +779,9 @@ parser.add_argument('-rgb', help='path to RGB level0_raw folder that also has th
 parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh low/med/high', default="low")
 parser.add_argument('-drtk', help='If RGB coordinates to be blockshifted, file containing \
                                                   DRTK base station coordinates from field and AUSPOS', default=None)
-parser.add_argument('-sunsens', help='boolean to use sun sensor data for reflectance calibration', default=False)
-parser.add_argument('-test', help='boolean to make processing faster for debugging', default=False)
-parser.add_argument('-multionly', help='boolean to process multispec chunk only', default=False)
+parser.add_argument('-sunsens', help='use sun sensor data for reflectance calibration', action='store_true')
+parser.add_argument('-test', help='make processing faster for debugging', action='store_true')
+parser.add_argument('-multionly', help='process multispec chunk only', action='store_true')
 
 global args
 args = parser.parse_args()
@@ -802,32 +789,15 @@ global MRK_PATH, MICASENSE_PATH
 
 global doc
 # Metashape project
-if args.proj_path:
-    doc = Metashape.Document()
-    proj_file = args.proj_path
-    doc.open(proj_file, read_only=False)  # Open the document in editable mode
-else:    
-    doc = Metashape.Document()
-    proj_file = doc.path
+
+doc = Metashape.Document()
+proj_file = args.proj_path
+doc.open(proj_file, read_only=False)  # Open the document in editable mode
+    
 
 if doc is None:
     print("Error: Metashape document object is not initialized.")
-    
-# if Metashape project has not been saved
-# Set the base directory for the project
-# Create the project file path using site and date arguments if proj_path is not provided
-# if Metashape project has not been saved
-if proj_file == '':
-        site = args.site
-        date = args.date
-        proj_file = os.path.join(BASE_DIR, site, date, f"{site}_{date}_metashape.psx")
-        if not os.path.exists(proj_file):
-            doc.save(proj_file)
-        print(f"Metashape project will be saved as {proj_file}")
-        doc.open(proj_file, read_only=False)  # Open the document in editable mode
-        doc.save(proj_file)
-else:
-        proj_file = args.proj_path
+    sys.exit()
 
 if args.rgb:
     MRK_PATH = args.rgb
@@ -863,13 +833,13 @@ if args.smooth not in DICT_SMOOTH_STRENGTH:
 if args.test:
     quality1 = 4 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     quality2 = 8 #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
-    quality3 = 4 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-    print("Test mode enabled: quality1 set to 4, quality2 set to 8, quality3 set to 4")
+    quality3 = 2 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    print("Test mode enabled: quality1 set to 4, quality2 set to 8, quality3 set to 2")
 else:
     quality1 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-    quality2 = 4  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
-    quality3 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-    print("Default mode: quality1 set to 2, quality2 set to 2, quality3 set to 2")
+    quality2 = 2  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
+    quality3 = 0 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    print("Default mode: quality1 set to 1, quality2 set to 2, quality3 set to 0")
 
 # Export blockshifted P1 positions. Not used in script. Useful for debug or to restart parts of script following any issues.
 P1_CAM_CSV = Path(proj_file).parent / "dbg_shifted_p1_pos.csv"
@@ -881,45 +851,6 @@ MICASENSE_CAM_CSV = Path(proj_file).parent / "interpolated_micasense_pos.csv"
 ##################
 # If the multionli argument is not set, add images to the project
 
-
-if not args.multionly:
-    # rgb
-    # Used to find chunks in proc_*
-    p1_images = find_files(MRK_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
-    chunk = doc.addChunk()
-    chunk.label = CHUNK_RGB
-    chunk.addPhotos(p1_images) # , load_xmp_accuracy=True if you want to add accuracy from XMP
-
-    # Check that chunk is not empty and images are in default WGS84 CRS
-    if len(chunk.cameras) == 0:
-        sys.exit("Chunk rgb empty")
-    # check chunk coordinate systems are default EPSG::4326
-    if "EPSG::4326" not in str(chunk.crs):
-            sys.exit("Chunk rgb: script expects images loaded to be in CRS WGS84 EPSG::4326")
-
-    #
-    # multispec
-    #
-    micasense_images = find_files(MICASENSE_PATH, (".jpg", ".jpeg", ".tif", ".tiff"))
-
-    chunk = doc.addChunk()
-    chunk.label = CHUNK_MULTISPEC
-    chunk.addPhotos(micasense_images)
-    doc.save()
-else:
-    # Used to find chunks in proc_*
-    check_chunk_list = [CHUNK_RGB, CHUNK_MULTISPEC]
-    dict_chunks = {}
-    for get_chunk in doc.chunks:
-        dict_chunks.update({get_chunk.label: get_chunk.key})
-
-    chunk = doc.findChunk(dict_chunks[CHUNK_RGB])
-    if not chunk:
-        sys.exit("Chunk rgb not found in the project")
-    
-    chunk = doc.findChunk(dict_chunks[CHUNK_MULTISPEC])
-    if not chunk:
-        sys.exit("Chunk multispec not found in the project")
 
 # Check that lever-arm offsets are non-zero:
 # As this script is for RGB and MS images captured simultaneously on dual gimbal, lever-arm offsets cannot be 0.
@@ -935,21 +866,9 @@ exif_tags = exifread.process_file(sample_img)
 cam_model = str(exif_tags.get('Image Model'))
 
 # HARDCODED number of bands.
-if len(chunk.sensors) >= 10:
-    # Dual sensor (RedEdge-MX Dual: 10, RedEdge-P Dual: 11)
-    # Dual sensor: If offsets are 0, exit with error.
-    if offset_dict[cam_model]['Dual'] == (0, 0, 0):
-        err_msg = "Lever-arm offsets for " + cam_model + " Dual on gimbal 2 cannot be 0. Update offset_dict and rerun script."
-        Metashape.app.messageBox(err_msg)
-    else:
-        MS_GIMBAL2_OFFSET = offset_dict[cam_model]['Dual']
-else:
-    # RedEdge-MX or RedEdge-P (5-band or 6-band respectively): If offsets are 0, exit with error.
-    if offset_dict[cam_model]['Red'] == (0, 0, 0):
-        err_msg = "Lever-arm offsets for " + cam_model + " Red on gimbal 2 cannot be 0. Update offset_dict and rerun script."
-        Metashape.app.messageBox(err_msg)
-    else:
-        MS_GIMBAL2_OFFSET = offset_dict[cam_model]['Red']
+# Dual sensor (RedEdge-MX Dual: 10, RedEdge-P Dual: 11)
+# Dual sensor: If offsets are 0, exit with error.
+MS_GIMBAL2_OFFSET = offset_dict[cam_model]['Dual']
 
 
 # Used to find chunks in proc_*
@@ -958,65 +877,11 @@ dict_chunks = {}
 for get_chunk in doc.chunks:
     dict_chunks.update({get_chunk.label: get_chunk.key})
 
-# Delete 'Chunk 1' that is created by default.
-if 'Chunk 1' in dict_chunks:
-    chunk = doc.findChunk(dict_chunks['Chunk 1'])
-    doc.remove(chunk)
-    doc.save()
-
-
-
-write_arguments_to_csv()
-
+# VERY IMPORTANT THE ACTUAL PROCESSING HAPPENS HERE
 resume_proc()
 
-# Open the Metashape document
-doc.open(proj_file, read_only=False)  # Open the document
-#
 # # Stop script here. User to click 'Resume Processing' once following steps are complete.
 # # see resume_proc() for processing steps.
 doc.save()
-print("Add images completed.")
-print("###########################")
-print("###########################")
-print("###########################")
-print("###########################")
-print(
-    "Step 1. In the Workspace pane, select multispec chunk. Select Tools-Calibrate Reflectance and 'Locate panels'. Press Cancel once the panels have been located.")
-print(
-    "Note: The csv of the calibration panel will have to be loaded if this is the first run on the machine. See the protocol for more information.")
-print(
-    "Step 2. In the Workspace pane under multispec chunk open Calibration images folder. Select and remove images not to be used for calibration.")
-print("Step 3. Press the 'Show Masks' icon in the toolbar and inspect the masks on calibration images.")
-print(
-    "Complete Steps 1 to 3 and press 'Resume Processing' to continue. Reflectance calibration will be completed in the script.")
-print("###########################")
-print("###########################")
-print("###########################")
-print("###########################")
-
-"""     label = "Resume processing"
-    Metashape.app.removeMenuItem(label)
-    Metashape.app.addMenuItem(label, resume_proc)
-
-    label1 = "Proceed to next prject"
-    Metashape.app.removeMenuItem(label1)
-    Metashape.app.addMenuItem(label1, proceed_to_next_project)
-    Metashape.app.messageBox(
-            "Complete Steps 1 to 3 listed on the Console tab and then click on 'Resume Processing' in the toolbar"
-            "Completed loading images and created file structure. Click on 'Proceed to next project' in the toolbar to continue with the next project or Click .")
-
-    def main():
-        # Access arguments
-        script_path = sys.argv[0]
-        arguments = sys.argv[1:]
-        
-        # Process arguments
-        for i in range(0, len(arguments), 2):
-            key = arguments[i]
-            value = arguments[i + 1]
-            print(f"{key}: {value}")
-
-    if __name__ == "__main__":
-        main() """
+print("DONE WITH PROJ:", proj_file)
 

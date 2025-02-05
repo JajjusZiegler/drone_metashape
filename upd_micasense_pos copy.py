@@ -25,7 +25,6 @@ import numpy as np
 import exifread
 import datetime
 from pyproj.transformer import TransformerGroup
-from datetime import datetime, timedelta
 
 ###############################################################################
 # Variable declarations, constants
@@ -41,7 +40,7 @@ P1_last_timestamp = {}
 
 LEAPSECS = 37
 GPSUTC_deltat = 0
-MICA_deltat = -18
+MICA_deltat = 0
 EPSG_4326 = 4326
 
 
@@ -66,8 +65,8 @@ def get_P1_timestamp(p1_mrk_line):
     secs = float(mrk_line[1])
     week = int(mrk_line[2].strip("[").strip("]"))
     epoch_secs = secs + (week*7*24*60*60)
-    temp_timestamp = datetime(1980, 1, 6) + timedelta(seconds=epoch_secs)
-    p1_camera_timestamp = temp_timestamp - timedelta(seconds=GPSUTC_deltat) 
+    temp_timestamp =  datetime.datetime(1980, 1, 6) + datetime.timedelta(seconds=epoch_secs)
+    p1_camera_timestamp = temp_timestamp - datetime.timedelta(seconds=GPSUTC_deltat) 
     return(p1_camera_timestamp.timestamp())
 
 
@@ -107,13 +106,14 @@ def get_P1_position(MRK_file, file_count):
     P1_last_timestamp[file_count] = get_P1_timestamp(mrks[-1])
     
     for mrk in mrks:
-        m = mrk.split()
+        m=mrk.split()
         
+        #photo_num = int(m[0])
         secs = float(m[1])
         week = int(m[2].strip("[").strip("]"))
         epoch_secs = secs + (week*7*24*60*60)
-        temp_timestamp = datetime(1980, 1, 6) + timedelta(seconds=epoch_secs)
-        camera_timestamp = temp_timestamp - timedelta(seconds=GPSUTC_deltat)
+        temp_timestamp = datetime.datetime(1980, 1, 6) + datetime.timedelta(seconds = epoch_secs)
+        camera_timestamp = temp_timestamp - datetime.timedelta(seconds = GPSUTC_deltat)
         
         lat = float(m[6].split(",")[0])
         lon = float(m[7].split(",")[0])
@@ -205,10 +205,10 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
         subsec *= negative
         millisec = subsec * 1e3
         
-        utc_time = datetime.strptime(mica_time, "%Y:%m:%d %H:%M:%S")
-        temp_timestamp = utc_time + timedelta(milliseconds=millisec)
+        utc_time = datetime.datetime.strptime(mica_time, "%Y:%m:%d %H:%M:%S")
+        temp_timestamp = utc_time + datetime.timedelta(milliseconds = millisec)
                
-        mica_timestamp = temp_timestamp - timedelta(seconds=MICA_deltat)
+        mica_timestamp = temp_timestamp - datetime.timedelta(seconds = MICA_deltat)
         mica_events.append(mica_timestamp)
         
         # Get geotagged positions
@@ -314,11 +314,11 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
                 upd_pos1 = P1_pos[a-1]
                 upd_pos2 = P1_pos[a]
     
-        time_delta = 0
+        time_delta=0
         if (time2-time1) != 0:
             time_delta = (camera_time_sec - time1)/(time2 - time1)
       
-        upd_micasense_pos = [0.0, 0.0, 0.0]
+        upd_micasense_pos = [0.0,0.0,0.0]
         upd_micasense_pos[0] = upd_pos1[0] + time_delta * (upd_pos2[0] - upd_pos1[0])
         upd_micasense_pos[1] = upd_pos1[1] + time_delta * (upd_pos2[1] - upd_pos1[1])
         upd_micasense_pos[2] = upd_pos1[2] + time_delta * (upd_pos2[2] - upd_pos1[2])
@@ -329,7 +329,7 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
         pos_index = mica_events.index(m_cam_time)
         
         # For images captured within P1 times, write updated Easting, Northing, Ellipsoidal height to CSV
-        if(upd_micasense_pos[2] != 0):
+        if(upd_micasense_pos[2]!=0):
             rec = ("%s, %10.4f, %10.4f, %10.4f\n" % \
                     (image_name, upd_micasense_pos[0], upd_micasense_pos[1], upd_micasense_pos[2]))
         else:
