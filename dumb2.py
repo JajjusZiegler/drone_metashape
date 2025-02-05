@@ -1,36 +1,15 @@
-# -*- coding: utf-8 -*-
-"""
-Created August 2021
-
-@authors: Poornima Sivanandam and Darren Turner
-
-Script by Darren Turner (lever_arm_m300.py) updated to interpolate micasense camera positions using P1 MRK.
-
-This module is imported in other py scripts that process p1+micasense imagery.
-
-- EXIF Image Date/Time and SubSecTime of MicaSense master band images used to identify the two closest P1 images (before
-  and after Micasense image).
-- P1 positions converted to target projected coordinate reference system for interpolation based on timestamp and distance 
-- MicaSense position interpolated using the timestamps and positions of the two closest P1 images
-- If Micasense image was captured before P1 triggered, original X, Y and Altitude of 0 written to output CSV to delete
-  these images later (outisde this script).
-- Updated camera coordinates written in csv in the format (and with the header):
-    label, Easting, Northing, Ellipsoidal height
-
-"""
-
+import numpy as np
+import Metashape
+import upd_micasense_pos_copy as upd_micasense_pos
 import os
 import glob
 import numpy as np
 import exifread
 import datetime
 from pyproj.transformer import TransformerGroup
-from datetime import datetime, timedelta
+from upd_micasense_pos_copy import find_nearest
+from upd_micasense_pos_copy import _convert_to_degress
 
-###############################################################################
-# Variable declarations, constants
-###############################################################################
-global mrk_file_count, P1_first_timestamp, P1_last_timestamp, P1_events, P1_pos, P1_pos_mrk
 
 P1_shift_vec = np.array([0.0, 0.0, 0.0])
 P1_events = []
@@ -41,88 +20,17 @@ P1_last_timestamp = {}
 
 LEAPSECS = 37
 GPSUTC_deltat = 0
-MICA_deltat = -18
+MICA_deltat = 0
 EPSG_4326 = 4326
 
 
-###############################################################################
-# Functions
-###############################################################################
 
-def find_nearest(array, value):
-    """
-    Return index of value nearest to "value" in array, that is, nearest P1 timestamp to MicaSense time 'value'
-    """
-    array = np.asarray(array)
-    idx = (np.abs(array - value)).argmin()
-    return idx   
+P1_shift_vec = np.array([0.0, 0.0, 0.0])
+img_suffix_master = "_2"
+MRK_PATH = r"M:\\working_package_2\\2024_dronecampaign\\01_data\\dronetest\\P1Data\\DJI_202408080937_002_p1micasense60mtest"
+MICASENSE_PATH = r"M:\\working_package_2\\2024_dronecampaign\\01_data\\dronetest\\MicasenseData\\fullset"
+MICASENSE_CAM_CSV = "interpolated_micasense_pos.csv"
 
-
-def get_P1_timestamp(p1_mrk_line):
-    """
-    Return timestamp from line p1_mrk_line in MRK
-    """
-    mrk_line = p1_mrk_line.split()   
-    secs = float(mrk_line[1])
-    week = int(mrk_line[2].strip("[").strip("]"))
-    epoch_secs = secs + (week*7*24*60*60)
-    temp_timestamp = datetime(1980, 1, 6) + timedelta(seconds=epoch_secs)
-    p1_camera_timestamp = temp_timestamp - timedelta(seconds=GPSUTC_deltat) 
-    return(p1_camera_timestamp.timestamp())
-
-
-def _convert_to_degress(value):
-    """
-    Helper function to convert the GPS coordinates stored in the EXIF to degress in float format
-    :param value:
-    :type value: exifread.utils.Ratio
-    :rtype: float
-    """
-    d = float(value.values[0].num) / float(value.values[0].den)
-    m = float(value.values[1].num) / float(value.values[1].den)
-    s = float(value.values[2].num) / float(value.values[2].den)
-
-    return d + (m / 60.0) + (s / 3600.0)
-
-
-def get_P1_position(MRK_file, file_count):
-    """
-    Inputs: MRK file name, file count (in case of more than one MRK file for same mission). 
-    Returns: None
-    - Updates First and Last P1 timestamp for flight
-    For all images:
-    - Update P1_events with camera timestamp
-    - Update P1_pos_mrk with Lat/Lon/Ellipsoidal height from MRK
-
-    """
-    global P1_first_timestamp, P1_last_timestamp
-    global P1_pos_mrk, P1_events
-        
-    print("Get P1 position")
-
-    with open(MRK_file, 'r') as mrk_in:
-        mrks = mrk_in.readlines()
-    
-    P1_first_timestamp[file_count] = get_P1_timestamp(mrks[0])
-    P1_last_timestamp[file_count] = get_P1_timestamp(mrks[-1])
-    
-    for mrk in mrks:
-        m = mrk.split()
-        
-        secs = float(m[1])
-        week = int(m[2].strip("[").strip("]"))
-        epoch_secs = secs + (week*7*24*60*60)
-        temp_timestamp = datetime(1980, 1, 6) + timedelta(seconds=epoch_secs)
-        camera_timestamp = temp_timestamp - timedelta(seconds=GPSUTC_deltat)
-        
-        lat = float(m[6].split(",")[0])
-        lon = float(m[7].split(",")[0])
-        ellh = float(m[8].split(",")[0])
-        
-        P1_events.append(camera_timestamp)
-        P1_pos_mrk.append([lat, lon, ellh])
-
-    
 def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_file, P1_shift_vec):
     """
     Parameters
@@ -205,10 +113,10 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
         subsec *= negative
         millisec = subsec * 1e3
         
-        utc_time = datetime.strptime(mica_time, "%Y:%m:%d %H:%M:%S")
-        temp_timestamp = utc_time + timedelta(milliseconds=millisec)
+        utc_time = datetime.datetime.strptime(mica_time, "%Y:%m:%d %H:%M:%S")
+        temp_timestamp = utc_time + datetime.timedelta(milliseconds = millisec)
                
-        mica_timestamp = temp_timestamp - timedelta(seconds=MICA_deltat)
+        mica_timestamp = temp_timestamp - datetime.timedelta(seconds = MICA_deltat)
         mica_events.append(mica_timestamp)
         
         # Get geotagged positions
@@ -254,10 +162,19 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
         # Get first and last P1 timestamp. Update global vars with timestamp and position of all P1 images.
         get_P1_position(mrk_file, loop_count)
         loop_count = loop_count + 1
-        
+    
+    # Debug print to check the contents of P1_pos_mrk
+    print("P1_pos_mrk:", P1_pos_mrk)
+    
     # Shift Lat/Lon/Ellip height in P1_pos_mrk
     # If blockshift was not enabled, P1_shift_vec will be 0,0,0 
     P1_pos_arr = np.array(P1_pos_mrk)
+    
+    # Check if P1_pos_arr is empty
+    if P1_pos_arr.size == 0:
+        print("Error: P1_pos_mrk is empty. Ensure that MRK files are correctly processed.")
+        return
+    
     P1_pos_shifted = P1_pos_arr + P1_shift_vec         
     
     # Convert to target projected CRS prior to interpolating position
@@ -314,44 +231,94 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
                 upd_pos1 = P1_pos[a-1]
                 upd_pos2 = P1_pos[a]
     
-            # Compute time_delta only if time2 and time1 are different
-            time_delta = 0.0
-
-            if (time2 - time1) != 0:
-                time_delta = (camera_time_sec - time1) / (time2 - time1)
-
-            # Interpolate Easting (X) and Northing (Y) from P1 positions:
-            interp_E = upd_pos1[0] + time_delta * (upd_pos2[0] - upd_pos1[0])
-            interp_N = upd_pos1[1] + time_delta * (upd_pos2[1] - upd_pos1[1])
-
-            # Interpolate the altitude (Z) from the P1 data:
-            interp_h = upd_pos1[2] + time_delta * (upd_pos2[2] - upd_pos1[2])
-
-            # If needed, you can adjust the altitude to a different vertical datum.
-            # For example, if your P1 altitude is ellipsoidal and you need to convert to MSL,
-            # you can use a geoid model to get the geoid height at (interp_E, interp_N).
-            #
-            # Uncomment and modify the next two lines if you have a function to get the geoid offset:
-            #
-            # geoid_offset = get_geoid_offset(interp_E, interp_N)  # User-defined function: returns the geoid separation at this point.
-            # interp_h = interp_h - geoid_offset  # Adjust the ellipsoidal height to mean sea level (or vice versa)
-
-            # Combine into a new interpolated position vector for the MicaSense image:
-            upd_micasense_pos = [interp_E, interp_N, interp_h]
-
-
-                    # For images captured within P1 times, write updated Easting, Northing, Ellipsoidal height to CSV
-            if(upd_micasense_pos[2] != 0):
-                        rec = ("%s, %10.4f, %10.4f, %10.4f\n" % \
-                                (image_name, upd_micasense_pos[0], upd_micasense_pos[1], upd_micasense_pos[2]))
-            else:
-                        # For MicaSense images captured outisde P1 times, just save original Easting, Northing. BUT set ellipsoidal height to 0 
-                        # to filter and delete these cameras
-                        rec = ("%s, %10.4f, %10.4f, %10.4f\n" % \
-                                (image_name, mica_pos[pos_index][0], mica_pos[pos_index][1], upd_micasense_pos[2]))
-                        
-            out_frame.write(rec) 
-            count = count + 1
+        time_delta=0
+        if (time2-time1) != 0:
+            time_delta = (camera_time_sec - time1)/(time2 - time1)
+      
+        upd_micasense_pos = [0.0,0.0,0.0]
+        upd_micasense_pos[0] = upd_pos1[0] + time_delta * (upd_pos2[0] - upd_pos1[0])
+        upd_micasense_pos[1] = upd_pos1[1] + time_delta * (upd_pos2[1] - upd_pos1[1])
+        upd_micasense_pos[2] = upd_pos1[2] + time_delta * (upd_pos2[2] - upd_pos1[2])
+    
+        path_image_name = filelist[count]
+        image_name = path_image_name.split("\\")[-1]
+        
+        pos_index = mica_events.index(m_cam_time)
+        
+        # For images captured within P1 times, write updated Easting, Northing, Ellipsoidal height to CSV
+        if(upd_micasense_pos[2]!=0):
+            rec = ("%s, %10.4f, %10.4f, %10.4f\n" % \
+                    (image_name, upd_micasense_pos[0], upd_micasense_pos[1], upd_micasense_pos[2]))
+        else:
+            # For MicaSense images captured outisde P1 times, just save original Easting, Northing. BUT set ellipsoidal height to 0 
+            # to filter and delete these cameras
+            rec = ("%s, %10.4f, %10.4f, %10.4f\n" % \
+                    (image_name, mica_pos[pos_index][0], mica_pos[pos_index][1], upd_micasense_pos[2]))
+            
+        out_frame.write(rec) 
+        
+        # Print the closest two P1 camera timestamps for the first 20 MicaSense cameras
+        if count < 20:
+            print(f"MicaSense Image: {image_name}")
+            print(f"Closest P1 Timestamp 1: {datetime.datetime.fromtimestamp(time1)}")
+            print(f"Closest P1 Timestamp 2: {datetime.datetime.fromtimestamp(time2)}")
+            print()
+        
+        count = count + 1
         
     # Close the CSV file
     out_frame.close()
+
+def get_P1_position(mrk_file, loop_count):
+    global P1_pos_mrk, P1_events, P1_first_timestamp, P1_last_timestamp
+
+    print(f"Processing MRK file: {mrk_file}")
+
+    with open(mrk_file, 'r') as f:
+        lines = f.readlines()
+
+    for line in lines:
+        if line.startswith('%'):
+            continue
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+
+        try:
+            # Extract the relevant parts of the line
+            timestamp = float(parts[0])
+            lat = float(parts[7].replace(',', ''))  # Assuming latitude is at index 7
+            lon = float(parts[9].replace(',', ''))  # Assuming longitude is at index 9
+            alt = float(parts[11].replace(',', ''))  # Assuming altitude is at index 11
+        except ValueError as e:
+            print(f"Error parsing line: {line}")
+            print(e)
+            continue
+
+        P1_events.append(datetime.datetime.utcfromtimestamp(timestamp))
+        P1_pos_mrk.append([lat, lon, alt])
+
+    if P1_events:
+        if loop_count == 1:
+            P1_first_timestamp[loop_count] = P1_events[0].timestamp()
+        P1_last_timestamp[loop_count] = P1_events[-1].timestamp()
+
+        print(f"First timestamp: {P1_first_timestamp[loop_count]}")
+        print(f"Last timestamp: {P1_last_timestamp[loop_count]}")
+        print(f"Number of positions: {len(P1_pos_mrk)}")
+    else:
+        print("No valid P1 events found in the MRK file.")
+
+# Ensure global variables are initialized
+P1_pos_mrk = []
+P1_events = []
+P1_first_timestamp = {}
+P1_last_timestamp = {}
+
+# Example usage
+MRK_PATH = r"M:\\working_package_2\\2024_dronecampaign\\01_data\\dronetest\\P1Data\\DJI_202408080937_002_p1micasense60mtest"
+MICASENSE_PATH = r"M:\\working_package_2\\2024_dronecampaign\\01_data\\dronetest\\MicasenseData\\fullset"
+img_suffix_master = "_2"
+output_csv_path = "interpolated_micasense_pos.csv"
+
+ret_micasense_pos(MRK_PATH, MICASENSE_PATH, img_suffix_master, 2056, output_csv_path, P1_shift_vec)

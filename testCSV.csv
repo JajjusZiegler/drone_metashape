@@ -1,0 +1,9 @@
+date,site_id,weather,crs,multispec,rgb,smooth,drtk,site_name,date
+02/07/2024,LWF-Davos,cloudy,7855,M:/data/multispec/20240613,M:/data/rgb/20240613,low,M:/data/drtk/20240613_drtk.txt,Pynwald,20240613
+08/07/2024,Sanasilva-50845,"sunny, no clouds",7855,M:/data/multispec/20240708,M:/data/rgb/20240708,low,M:/data/drtk/20240708_drtk.txt,Sanasilva,20240708
+08/07/2024,Sanasilva-50845,"sunny, no clouds",7855,M:/data/multispec/20240708,M:/data/rgb/20240708,low,M:/data/drtk/20240708_drtk.txt,Sanasilva,20240708
+08/07/2024,Sanasilva-50877,"sunny, 1 cloud at the beginning of the flight",7855,M:/data/multispec/20240708,M:/data/rgb/20240708,low,M:/data/drtk/20240708_drtk.txt,Sanasilva,20240708
+08/07/2024,Sanasilva-50877,"sunny, no clouds",7855,M:/data/multispec/20240708,M:/data/rgb/20240708,low,M:/data/drtk/20240708_drtk.txt,Sanasilva,20240708
+15/07/2024,lwf_schänis,"sunny, no clouds. long shadows dur to steep north slope and early morning",7855,M:/data/multispec/20240715,M:/data/rgb/20240715,low,M:/data/drtk/20240715_drtk.txt,Schänis,20240715
+15/07/2024,treenet_sempach,"sunny, no clouds",7855,M:/data/multispec/20240715,M:/data/rgb/20240715,low,M:/data/drtk/20240715_drtk.txt,Sempach,20240715
+16/07/2024,treenet_salgesch,"sunny no clouds",7855,M:/data/multispec/20240716,M:/data/rgb/20240716,low,M:/data/drtk/20240716_drtk.txt,Salgesch,20240716

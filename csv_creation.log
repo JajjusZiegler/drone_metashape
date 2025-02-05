@@ -1,0 +1,32 @@
+2025-02-03 13:43:11,535 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx
+2025-02-03 13:43:11,563 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\RGBandMulti_data.csv
+2025-02-03 13:43:11,570 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\multispectral_data.csv
+2025-02-03 14:22:53,258 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx
+2025-02-03 14:22:53,272 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\RGBandMulti_data.csv
+2025-02-03 14:25:52,372 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx
+2025-02-03 14:25:52,391 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\RGBandMulti_data.csv
+2025-02-03 14:25:52,393 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\multispectral_data.csv
+2025-02-03 14:34:12,189 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test.xlsx
+2025-02-03 14:34:12,213 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_data.csv
+2025-02-03 14:34:12,219 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_multispectral_data.csv
+2025-02-03 16:33:47,699 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test.xlsx
+2025-02-03 16:33:47,717 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_data.csv
+2025-02-03 16:33:47,723 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_multispectral_data.csv
+2025-02-03 17:11:10,854 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx
+2025-02-03 17:11:10,872 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_RGBandMulti_data.csv
+2025-02-03 17:11:10,879 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_multispectral_data.csv
+2025-02-03 20:13:54,260 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx
+2025-02-03 20:13:54,260 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_RGBandMulti_data.csv
+2025-02-03 20:13:54,276 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_multispectral_data.csv
+2025-02-03 20:13:54,936 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx
+2025-02-03 20:13:54,948 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_RGBandMulti_data.csv
+2025-02-03 20:13:54,948 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_multispectral_data.csv
+2025-02-03 20:13:55,588 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx
+2025-02-03 20:13:55,604 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_RGBandMulti_data.csv
+2025-02-03 20:13:55,604 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_multispectral_data.csv
+2025-02-04 16:08:31,571 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx
+2025-02-04 16:08:31,593 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_RGBandMulti_data.csv
+2025-02-04 16:08:31,593 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_multispectral_data.csv
+2025-02-04 16:31:35,558 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test.xlsx
+2025-02-04 16:31:35,565 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_data.csv
+2025-02-04 16:31:35,565 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_multispectral_data.csv
