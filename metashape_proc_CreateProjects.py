@@ -65,7 +65,7 @@ def process_projects(input_csv, output_csv):
             sunsens = row['sunsens']
 
             # Define project path
-            proj_directory = Path(r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder")
+            proj_directory = Path(r"U:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder")
             proj_file = proj_directory / site / date / f"metashape_project_{site}_{date}.psx"
 
             # Prepare result entry

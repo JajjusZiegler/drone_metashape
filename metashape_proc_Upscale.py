@@ -92,6 +92,9 @@ from pathlib import Path
 # "C:\Program Files\Agisoft\Metashape Pro\python\python.exe" -m pip install <modulename>
 # See M300 data processing protocol for more information.
 
+# GPU enabled
+
+
 # Metashape Python API updates in v2.0
 METASHAPE_V2_PLUS = False
 found_version = Metashape.app.version.split('.')  # e.g. 2.0.1

@@ -5,13 +5,13 @@ import os
 from pathlib import Path
 
 # Path to the CSV file containing the arguments
-csv_file_path = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_data_processed.csv"
+csv_file_path = r"U:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_dataproject_created.csv"
 
 # Path to the target Python script you want to call
-target_script_path = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\metashape_proc_Upscale.py"
+target_script_path = r"C:\Users\Administrator\drone_metashape\metashape_proc_Upscale_copy.py"
 
 # Hardcoded CRS (Modify this to your desired coordinate system)
-HARDCODED_CRS = "2056"  # set to Swiss LV95 by default
+HARDCODED_CRS = "2056"  # might be issues with swiss coordinates stick to WGS84
 def check_output_files_exist(project_path):
     """Check if expected output files exist"""
     project_dir = Path(project_path).parent
@@ -89,6 +89,8 @@ with open(csv_file_path, mode='r', newline='', encoding='utf-8') as csv_file:
             cmd.extend(["-rgb", row['rgb']])
         if row.get('sunsens', '').lower() == 'true':
             cmd.append("-sunsens")
+        # Add test flag    
+        cmd.append("-test")
         
         # Add test flag
         #cmd.append("-test")

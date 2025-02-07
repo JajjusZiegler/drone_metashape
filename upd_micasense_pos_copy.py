@@ -40,7 +40,7 @@ P1_last_timestamp = {}
 
 LEAPSECS = 37
 GPSUTC_deltat = 0
-MICA_deltat = 
+MICA_deltat = -18
 EPSG_4326 = 4326
 
 
