@@ -30,6 +30,10 @@ def find_files(folder: Path, extensions: Tuple[str]) -> List[str]:
         if p.suffix.lower() in extensions and p.is_file()
     ]
 
+# Define Metashape project directory
+proj_directory = Path(r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\20250220_DEMfuntionality_Test")
+
+
 # Chunk labels
 CHUNK_RGB = "rgb"
 CHUNK_MULTISPEC = "multispec"
@@ -48,7 +52,7 @@ def process_projects(input_csv, output_csv):
     """
     Processes projects from the input CSV and writes results to the output CSV.
     """
-    with open(input_csv, 'r', newline='') as infile, open(output_csv, 'a', newline='') as outfile:
+    with open(input_csv, 'r', newline='', encoding='utf-8') as infile, open(output_csv, 'a', newline='', encoding='utf-8') as outfile: # Added encoding='utf-8' for both files        
         reader = csv.DictReader(infile)
         writer = csv.writer(outfile)
 
@@ -65,7 +69,6 @@ def process_projects(input_csv, output_csv):
             sunsens = row['sunsens']
 
             # Define project path
-            proj_directory = Path(r"U:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder")
             proj_file = proj_directory / site / date / f"metashape_project_{site}_{date}.psx"
 
             # Prepare result entry
@@ -177,6 +180,6 @@ if __name__ == "__main__":
 
     # Generate output path automatically
     input_path = Path(args.input_csv)
-    output_csv = input_path.with_name(input_path.stem + "project_created.csv")
+    output_csv = proj_directory.with_name(input_path.stem + "project_created.csv")
     
     process_projects(args.input_csv, str(output_csv))

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 # Path to the CSV file containing the arguments
-csv_file_path = r"U:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_dataproject_created.csv"
+csv_file_path = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_dataproject_created.csv"
 
 # Path to the target Python script you want to call
 target_script_path = r"C:\Users\Administrator\drone_metashape\metashape_proc_Upscale_copy.py"
@@ -61,6 +61,8 @@ with open(csv_file_path, mode='r', newline='', encoding='utf-8') as csv_file:
     csv_reader = csv.DictReader(csv_file)
     
     for row in csv_reader:
+        cmd = [sys.executable, target_script_path]
+
         project_path = row['project_path']
         
         # Skip processing if outputs exist
@@ -76,7 +78,6 @@ with open(csv_file_path, mode='r', newline='', encoding='utf-8') as csv_file:
             print(f"Skipping row due to missing required arguments: {missing_args} - Row: {row}")
             continue
         
-        cmd = ["python", target_script_path]
         cmd.extend(["-proj_path", row['project_path']])
         cmd.extend(["-date", row['date']])
         cmd.extend(["-site", row['site']])

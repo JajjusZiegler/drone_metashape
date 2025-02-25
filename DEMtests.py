@@ -100,13 +100,21 @@ if int(found_version[0]) >= 2:
     METASHAPE_V2_PLUS = True
 
 ###############################################################################
+# User-defined variables
 # BASE DIRECTORY If you run multiple projects, update this path
 # Decoide if you want to use model or DEM or for Orthomoasaic
 ###############################################################################
+BASE_DIR = "M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TetsDEMresolution1"
 
-BASE_DIR = "M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder"
 
-use_model = False
+
+dem_res = [0.05,0.1,0.2,0.3]  # DEM resolutions in meters. For testing set to [0.2, 0.5] . For final processing set to desired value(s). 
+ortho_res = 0.01  # Orthomosaic resolution in meters. For testing set to 0.5 or higher. For final processing set to 0.01
+
+####
+#   IMPORTANT set quality settings !
+
+use_model = True
 use_dem = True
 
 ###############################################################################
@@ -247,6 +255,114 @@ def copyBoundingBox(from_chunk_label, to_chunk_label):
 
     to_chunk.region = new_region
 
+def export_rgb_dem_ortho(chunk, proj_file, dem_resolutions, ortho_resolution):
+    """
+    Exports DEMs at different resolutions, imports them back, and builds corresponding RGB orthomosaics.
+    """
+    compression = Metashape.ImageCompression()
+    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW  # default on Metashape
+    compression.tiff_big = True
+    compression.tiff_tiled = True
+    compression.tiff_overviews = True
+    print(f"--- Processing RGB Chunk: {chunk.label} for DEM and Orthomosaic at different resolutions ---")
+
+    dem_files_rgb = {}
+
+    for dem_res_meters in dem_resolutions:
+        dem_res_cm = round(dem_res_meters * 100)
+
+        print(f"  Setting elevation key for DEM resolution {dem_res_meters}m")
+        chunk.elevation = chunk.elevations[0]  # Ensuring correct resolution assignment
+
+        dem_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_dem_{dem_res_cm}cm.tif")
+
+        res_m = float(dem_res_meters)
+
+        print(f"  Exporting RGB DEM at resolution {dem_res_meters}m ({dem_res_cm}cm)...")
+        chunk.exportRaster(
+            path=str(dem_file),
+            source_data=Metashape.ElevationData,
+            image_format=Metashape.ImageFormatTIFF,
+            image_compression=compression,
+            resolution=res_m
+        )
+        dem_files_rgb[dem_res_meters] = dem_file
+        print(f"  Exported RGB DEM: {dem_file}")
+        logging.info(f"Exported RGB DEM at resolution {dem_res_meters}m: {dem_file}")
+
+        # Import DEM back into the RGB chunk
+        print(f"  Importing DEM {dem_file} back into RGB chunk...")
+        chunk.elevation = None  # Clear existing elevation data
+        chunk.importRaster(path=str(dem_file), crs=chunk.crs, format=Metashape.ImageFormatTIFF)
+        print(f"  Imported DEM {dem_file}")
+
+        # Generate RGB orthomosaic using the imported DEM
+        print(f"  Building RGB Orthomosaic using imported DEM ({dem_res_cm}cm)...")
+        chunk.buildOrthomosaic(
+            surface_data=Metashape.DataSource.ElevationData,
+            refine_seamlines=True,
+            fill_holes=True,
+            blending_mode=Metashape.BlendingMode.MosaicBlending,
+            resolution= float(ortho_resolution) # User-defined ortho resolution in function arguments
+        )
+
+        logging.info(f"Built RGB Orthomosaic using imported DEM ({dem_res_cm}cm) for orthorectification in chunk {chunk.label} with parameters: surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=True, blending_mode=Metashape.BlendingMode.MosaicBlending")
+        
+        ortho_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_ortho_{int(ortho_resolution * 100)}cm_dem{int(res_m * 100)}cm.tif") # Added dem resolution to ortho filename
+
+        print(f"  Exporting RGB Orthomosaic...")
+        chunk.exportRaster(
+            path=str(ortho_file),
+            image_format=Metashape.ImageFormatTIFF,
+            save_alpha=False,
+            source_data=Metashape.OrthomosaicData,
+            image_compression=compression
+        )
+        print(f"  Exported RGB Orthomosaic: {ortho_file}")
+
+    return dem_files_rgb
+
+def process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_resolution):
+    """
+    Loads RGB DEMs into the multispec chunk and builds multispec orthomosaics for each DEM.
+    """
+    compression = Metashape.ImageCompression()
+    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
+    compression.tiff_big = True
+    compression.tiff_tiled = True
+    compression.tiff_overviews = True
+
+    print(f"--- Processing Multispec Chunk: {chunk.label} using RGB DEMs for Orthomosaics ---")
+
+    # print(f"Building Dense Cloud for Multispec Chunk: {chunk.label}") # Ensure dense cloud exists
+    # if METASHAPE_V2_PLUS:
+    #     chunk.buildDepthMaps(downscale=2)  # Medium downscale, adjust if needed
+    #     chunk.buildPointCloud()
+    # else:
+    #     chunk.buildDepthMaps(downscale=4)  # Medium/Low downscale for older versions
+    #     chunk.buildDenseCloud(quality=Metashape.DenseCloudQuality.Medium)
+
+    for dem_res, dem_file in rgb_dem_files.items():
+        dem_res_cm = round(dem_res * 100)
+        ortho_resolution_cm = int(ortho_resolution * 100)
+        print(f"  Loading RGB DEM at resolution {dem_res}m into Multispec Chunk: {chunk.label}")
+        chunk.elevation = None # Clear existing elevation data
+        chunk.importRaster(path=str(dem_file), crs=chunk.crs, format=Metashape.ImageFormatTIFF)
+        print(f"  Loaded DEM: {dem_file}")
+
+        print(f"  Building Multispec Orthomosaic using DEM at resolution {dem_res}m for chunk: {chunk.label}")
+        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=True, blending_mode=Metashape.BlendingMode.MosaicBlending,
+            resolution= float(ortho_resolution)) # User-defined ortho resolution in fuction arguments
+
+        ortho_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_ortho_{ortho_resolution_cm}cm_dem{dem_res_cm}cm.tif") # Added dem resolution to ortho filename
+        chunk.exportRaster(path=str(ortho_file),
+                             image_format=Metashape.ImageFormatTIFF, save_alpha=False,
+                             source_data=Metashape.OrthomosaicData, image_compression=compression)
+        logging.info(f"  Exported Multispec Orthomosaic at resolution {ortho_resolution} using DEM at resolution {dem_res}m for orthorectification in chunk {chunk.label}: {ortho_file}")
+
+    print(f"--- Completed Multispec Chunk: {chunk.label} processing using RGB DEMs ---")
+
+
 def proc_rgb():
     """
     Author: Poornima Sivanandam
@@ -275,9 +391,8 @@ def proc_rgb():
     proj_file = doc.path
     blockshift_p1 = False
 
-    # Export updated positions as csv for debug purposes. Not used in script.
-    chunk.exportReference(path=str(P1_CAM_CSV_WGS84), format=Metashape.ReferenceFormatCSV, columns="nxyz",
-                              delimiter=",", items=Metashape.ReferenceItemsCameras)
+
+
 
     if args.drtk is not None:
         blockshift_p1 = True
@@ -310,6 +425,19 @@ def proc_rgb():
             else:
                 camera.reference.location = camera.reference.location + P1_shift
 
+
+    # Log the reference CRS before reloading
+    logging.info(f"Reference CRS before reloading: {chunk.crs}")
+        # Export updated positions as csv for debug purposes. Not used in script.
+    #chunk.exportReference(path=str(P1_CAM_CSV_WGS84), format=Metashape.ReferenceFormatCSV, columns="nxyz",
+    #                          delimiter=",", items=Metashape.ReferenceItemsCameras)
+
+    # Reload EXIF information in WGS84 to prevent any issues with blockshifting
+    chunk.loadReferenceExif(load_rotation=True, load_accuracy=True)
+
+    # Log the reference CRS after reloading
+    logging.info(f"Reference CRS after reloading: {chunk.crs}")
+
     # Convert to projected coordinate system if necessary
     target_crs = Metashape.CoordinateSystem("EPSG::" + args.crs)
     current_chunk_crs = chunk.crs
@@ -336,15 +464,15 @@ def proc_rgb():
     chunk.exportReference(path=str(P1_CAM_CSV_CH1903), format=Metashape.ReferenceFormatCSV, columns="nxyz",
                               delimiter=",", items=Metashape.ReferenceItemsCameras)
 
-    # Convert to projected coordinate system
-    #target_crs = Metashape.CoordinateSystem("EPSG::" + args.crs)
-    #for camera in chunk.cameras:
+    # # Convert to projected coordinate system
+    # target_crs = Metashape.CoordinateSystem("EPSG::" + args.crs)
+    # for camera in chunk.cameras:
     #    if not camera.reference.location:
     #        continue
     #    camera.reference.location = Metashape.CoordinateSystem.transform(camera.reference.location, SOURCE_CRS,
     #                                                                     target_crs)
 
-    #chunk.crs = target_crs
+    # chunk.crs = target_crs
 
     global P1_shift_vec
     if blockshift_p1:
@@ -388,9 +516,9 @@ def proc_rgb():
     # change camera position accuracy to 0.1 m
     chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
 
-    # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
-    # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-    # Quality:  High, Reference Preselection: Source
+    # # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
+    # # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    # # Quality:  High, Reference Preselection: Source
     chunk.matchPhotos(downscale= quality1, generic_preselection=False, reference_preselection=True,
                       reference_preselection_mode=Metashape.ReferencePreselectionSource)
     chunk.alignCameras()
@@ -418,15 +546,20 @@ def proc_rgb():
     # downscale: ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
     print("Build dense cloud")
     # Medium quality. And default: mild filtering.
-    chunk.buildDepthMaps(downscale= quality2)
+    chunk.buildDepthMaps(downscale= quality2,reuse_depth=True)
     doc.save()
 
     if METASHAPE_V2_PLUS:
-        chunk.buildPointCloud()
+        chunk.buildPointCloud(keep_depth=True)
     else:
         chunk.buildDenseCloud()
     doc.save()
 
+    compression = Metashape.ImageCompression()
+    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW  # default on Metashape
+    compression.tiff_big = True
+    compression.tiff_tiled = True
+    compression.tiff_overviews = True
     #
     # Build Mesh
     #
@@ -450,85 +583,49 @@ def proc_rgb():
         smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
         chunk.smoothModel(smooth_val)
         # Export model for use in micasense chunk
-        model_file = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_smooth_" + str(smooth_val) + ".obj")
+        model_file = Path(proj_file).parent / f"{Path(proj_file).stem}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
         chunk.exportModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
+        # build Orthomoasaic from Model data
+        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
+        
+        ortho_file = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_model_ortho_01.tif")
+
+        chunk.exportRaster(path=str(ortho_file), resolution_x=ortho_res, resolution_y=ortho_res,
+                               image_format=Metashape.ImageFormatTIFF,
+                               save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
+        print("Exported orthomosaic " + str(ortho_file))
+
+        logging.info(f"Exported RGB orthomosaic: {ortho_file}")
+        print(f"OUTPUT_ORTHO_RGB: {ortho_file}")
 
     #
     # Build DEM
     #
-    compression = Metashape.ImageCompression()
-    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW  # default on Metashape
-    compression.tiff_big = True
-    compression.tiff_tiled = True
-    compression.tiff_overviews = True
+
     
     if use_dem:
-        print("Build DEM")
-    
-        # set resolution to 1 cm
-        dem_res_xy = 0.01
 
+        print("Build DEM at full resolution. ")
+    
+        
         if METASHAPE_V2_PLUS:
-            chunk.buildDem(source_data=Metashape.PointCloudData,resolution = dem_res_xy )
+            chunk.buildDem(source_data=Metashape.PointCloudData, interpolation=Metashape.DisabledInterpolation) # DisabledInterpolation for full resolution
         else:
-            chunk.buildDem(source_data=Metashape.DenseCloudData,resolution = dem_res_xy )
+            chunk.buildDem(source_data=Metashape.DenseCloudData, interpolation=Metashape.DisabledInterpolation) # DisabledInterpolation for full resolution
         doc.save()
 
-        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_01.tif")
+        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_full_res.tif")
 
         chunk.exportRaster(path=str(dem_file), source_data=Metashape.ElevationData, image_format=Metashape.ImageFormatTIFF, image_compression=compression)
         #include test variable for debugging:
 
-    test = args.test #default is False 
+        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
+        chunk.exportRaster(path=str(Path(proj_file).parent / (Path(proj_file).stem + "_rgb_ortho_fullresdem_1cm.pdf")), resolution_x=ortho_res, resolution_y=ortho_res,)
 
-    if not test:
-        #
-        # Build and export orthomosaic
-        #
-        print("Build orthomosaic")
-        if use_model:
-            chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
-        elif use_dem:
-            chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
-        else:
-            print("No valid surface data source specified for orthomosaic building.")
-        doc.save()
+        rgb_dem_files =export_rgb_dem_ortho(chunk, proj_file, dem_res, ortho_res)
 
-        if chunk.orthomosaic:
-            # set resolution to 1 cm
-            res_xy = 0.01
+        report_path = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_report.pdf")
 
-            # if rgb/ folder does not exist in MRK_PATH save orthomosaic in the project directory
-            # else save ortho in rgb/level1_proc/
-            p1_idx = MRK_PATH.find("rgb")
-            if p1_idx == -1:
-                dir_path = Path(proj_file).parent
-                print("Cannot find rgb/ folder. Saving ortho in " + str(dir_path))
-            else:
-                # create p1/level1_proc folder if it does not exist
-                dir_path = Path(MRK_PATH[:p1_idx + len("rgb")]) / "level1_proc"
-                dir_path.mkdir(parents=True, exist_ok=True)
-
-            # file naming format: <projname>_rgb_ortho_<res_in_m>.tif
-            ortho_file = dir_path / (
-                    Path(proj_file).stem + "_rgb_ortho_01.tif")
-
-
-            chunk.exportRaster(path=str(ortho_file), resolution_x=res_xy, resolution_y=res_xy,
-                               image_format=Metashape.ImageFormatTIFF,
-                               save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
-            print("Exported orthomosaic " + str(ortho_file))
-
-            logging.info(f"Exported RGB orthomosaic: {ortho_file}")
-            print(f"OUTPUT_ORTHO_RGB: {ortho_file}")
-
-
-        else:
-            print("Skipping orthomosaic building and exporting due to test mode.")
-
-        # Export the processing report
-        report_path = dir_path / (
-                    Path(proj_file).stem + "_rgb_report.pdf")
         print(f"Exporting processing report to {report_path}...")
         chunk.exportReport(path = str(report_path))
         doc.save()
@@ -537,78 +634,90 @@ def proc_rgb():
         print(f"OUTPUT_REPORT_RGB: {report_path}")
 
         print("RGB chunk processing complete!")
+
+        return rgb_dem_files #to be passed to process_multispec_ortho_from_dems
+
+    # test = args.test #default is False 
+
+    # if not test:
+    #     #
+    #     # Build and export orthomosaic
+    #     #
+    #     print("Build orthomosaic")
+    #     if use_model:
+    #         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
+    #     elif use_dem:
+    #         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
+    #     else:
+    #         print("No valid surface data source specified for orthomosaic building.")
+    #     doc.save()
+
+    #     if chunk.orthomosaic:
+    #         # set resolution to 1 cm
+    #         res_xy = 0.01
+
+    #         # if rgb/ folder does not exist in MRK_PATH save orthomosaic in the project directory
+    #         # else save ortho in rgb/level1_proc/
+    #         p1_idx = MRK_PATH.find("rgb")
+    #         if p1_idx == -1:
+    #             dir_path = Path(proj_file).parent
+    #             print("Cannot find rgb/ folder. Saving ortho in " + str(dir_path))
+    #         else:
+    #             # create p1/level1_proc folder if it does not exist
+    #             dir_path = Path(MRK_PATH[:p1_idx + len("rgb")]) / "level1_proc"
+    #             dir_path.mkdir(parents=True, exist_ok=True)
+
+    #         # file naming format: <projname>_rgb_ortho_<res_in_m>.tif
+    #         ortho_file = dir_path / (
+    #                 Path(proj_file).stem + "_rgb_ortho_01.tif")
+
+
+    #         chunk.exportRaster(path=str(ortho_file), resolution_x=res_xy, resolution_y=res_xy,
+    #                            image_format=Metashape.ImageFormatTIFF,
+    #                            save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
+    #         print("Exported orthomosaic " + str(ortho_file))
+
+    #         logging.info(f"Exported RGB orthomosaic: {ortho_file}")
+    #         print(f"OUTPUT_ORTHO_RGB: {ortho_file}")
+
+
+    #     else:
+    #         print("Skipping orthomosaic building and exporting due to test mode.")
+
+        # Export the processing report
+
    
 
 
-def proc_multispec():
+def proc_multispec(rgb_dem_files):
     """
     Author: Poornima Sivanandam
-    Arguments: None
-    Return: None
-    Create: Multispec orthomosaic in multispec/level1_proc or in Metashape project folder
-    Summary:
-        * Interpolate micasense image position using p1 pos and timestamp.
-        * Remove images that triggered outside p1 capture times
-        * Image Quality check
-        * Apply GPS/INS offset for gimbal 2
-        * Set primary channel to NIR
-        * Update Camera Accuracy settings for M300 RTK GNSS accuracy
-        * Set raster transform to export relative reflectance in orthomosaic
-        * Calibrate reflectance using both sun senors and panels
-        * Align images
-        * Build dense cloud
-        * Import RGB smoothed model (see proc_rgb)
-        * Build and export orthomosaic with raster transformed values (relative reflectance)
+    Description: 
+        Processes multispectral imagery by interpolating positions, filtering images, setting primary channels,
+        applying GPS offsets, calibrating reflectance, aligning images, and exporting an orthomosaic.
     """
-
     chunk = doc.findChunk(dict_chunks[CHUNK_MULTISPEC])
-
     target_crs = Metashape.CoordinateSystem("EPSG::" + args.crs)
-
-    # Get image suffix of master camera
+    
+    # Determine master camera suffix
     camera = chunk.cameras[0]
-    cam_master = camera.master.label.split('_')
-
-    # file naming assumption: IMG_xxxx_suffixNum
-    img_suffix_master = cam_master[2]
+    img_suffix_master = camera.master.label.split('_')[2]
     
-
-    #set P1_shift_vec to 0 if multionly is set
-    global P1_shift_vec 
+    # Set shift vector for P1 to zero if only multispectral processing is performed
+    global P1_shift_vec
     P1_shift_vec = np.array([0.0, 0.0, 0.0])
-
-    print("Interpolate Micasense position based on P1 with blockshift" + str(P1_shift_vec))
-
-
-
-    # inputs: paths to MRK file for P1 position, Micasense image path, image suffix for master band images, target CRS
-    # returns output csv file with interpolated micasense positions
-    ret_micasense_pos(MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs,
-                      str(MICASENSE_CAM_CSV), P1_shift_vec)
+    print(f"Interpolating Micasense position based on P1 with blockshift {P1_shift_vec}")
     
-    TransformHeight.process_csv(
-        input_file=str(MICASENSE_CAM_CSV),
-        output_file=str(MICASENSE_CAM_CSV_UPDATED),
-        geoid_path= str(GEOID_PATH)
-    )
-
-    # Load updated positions in the chunk BEWARE OF NXYZ
+    # Interpolate Micasense positions and apply transformations
+    ret_micasense_pos(MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
+    TransformHeight.process_csv(input_file=str(MICASENSE_CAM_CSV), output_file=str(MICASENSE_CAM_CSV_UPDATED), geoid_path=str(GEOID_PATH))
+    
+    # Load updated positions into Metashape
     chunk.importReference(str(MICASENSE_CAM_CSV_UPDATED), format=Metashape.ReferenceFormatCSV, columns="nxyz",
-                          delimiter=",", crs= target_crs, skip_rows=1,
-                          items=Metashape.ReferenceItemsCameras)
-    
-    """ for camera in chunk.cameras:
-        if not camera.reference.location:
-            continue
-        camera.reference.location = Metashape.CoordinateSystem.transform(camera.reference.location, SOURCE_CRS,
-                                                                         target_crs) """
+                          delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
     chunk.crs = target_crs
     doc.save()
-
-    # ret_micasense_pos wrote Altitude < 0 (last column) for MicaSense images that triggered when P1 did not.
-    # Create a list of cameras with Altitude < 0
-
-    # Create a list of cameras with Altitude < 0
+    
     del_camera_names = list()
 
     # Only look at altitude of master band images
@@ -617,11 +726,11 @@ def proc_multispec():
             continue
         if not camera.reference.location:
             continue
-        if camera.reference.location.z <= 0:
+        if camera.reference.location.z == 0:
             del_camera_names.append(camera.label)
 
     # Delete images outside of P1 capture times
-    print("Deleting MicaSense images that triggered outside P1 capture times")
+    logging.info("Deleting MicaSense images that triggered outside P1 capture times")
     for camera in chunk.cameras:
         # Only calibration images are in a group. The following line is necessary to avoid NoneType error on other images
         if camera.group is not None:
@@ -629,69 +738,29 @@ def proc_multispec():
                 continue
         if camera.label in del_camera_names:
             chunk.remove(camera)
-
-    # Disable images outside of P1 capture times
-    # print("Disabling MicaSense images that triggered outside P1 capture times")
-    # for camera in chunk.cameras:
-    #     # Only calibration images are in a group. The following line is necessary to avoid NoneType error on other images
-    #     if camera.group is not None:
-    #         if camera.group.label == 'Calibration images':
-    #             continue
-    #     if camera.label in del_camera_names:
-    #         camera.enabled = False
-            
-
-    # save project
-    doc.save()
-
-
-    # Set primary channel
-    #
-    # Get index of NIR band. Micasense Dual: NIR is sensors[9], and in RedEdge-M sensors[4]
-    if cam_model == 'RedEdge-M':
-        set_primary = "NIR"
-    elif cam_model == 'RedEdge-P':
-        set_primary = 'Panchro'
+    
+    # Set the primary channel
+    set_primary = "NIR" if cam_model == 'RedEdge-M' else 'Panchro'
     for s in chunk.sensors:
-        if s.label.find(set_primary) != -1:
-            print("Setting primary channel to " + s.label)
+        if set_primary in s.label:
+            print(f"Setting primary channel to {s.label}")
             chunk.primary_channel = s.layer_index
             break
-
-
-    # GPS/INS offset for master sensor
-    #
+    
+    # Apply GPS offset correction
     print("Updating Micasense GPS offset")
     chunk.sensors[0].antenna.location_ref = Metashape.Vector(MS_GIMBAL2_OFFSET)
-
-    #
-    # Set Raster Transform to calculate reflectance
-    #
+    
+    # Configure raster transformation for reflectance calculation
     print("Updating Raster Transform for relative reflectance")
-    raster_transform_formula = []
     num_bands = len(chunk.sensors)
-    if cam_model == 'RedEdge-M':
-        for band in range(1, num_bands + 1):
-            raster_transform_formula.append("B" + str(band) + "/32768")
-    elif cam_model == 'RedEdge-P':
-        # Skip Panchromatic band in multispec ortho.
-        # Panchro band: wavelength: 634.5 nm, Band 5 in RedEdge-P Dual and Band 3 in RedEdge-P.
-        if num_bands >= 10:
-            PANCHRO_BAND = 5
-        else:
-            PANCHRO_BAND = 3
-        for band in range(1, num_bands+1):
-            if band != PANCHRO_BAND:
-                raster_transform_formula.append("B" + str(band) + "/32768")
-
+    raster_transform_formula = [f"B{band}/32768" for band in range(1, num_bands + 1) if cam_model != 'RedEdge-P' or band != (5 if num_bands >= 10 else 3)]
     chunk.raster_transform.formula = raster_transform_formula
     chunk.raster_transform.calibrateRange()
     chunk.raster_transform.enabled = True
     doc.save()
+    
 
-    #
-    # Estimate image quality and remove cameras with quality < threshold
-    #
     if METASHAPE_V2_PLUS:
         chunk.analyzeImages()
     else:
@@ -702,116 +771,52 @@ def proc_multispec():
         print("Removing cameras with Image Quality < %.1f" % 0.5)
         chunk.remove(list(set(low_img_qual)))
     doc.save()
-    #
-    #
+    
     # Calibrate Reflectance
-    #
-    chunk.calibrateReflectance(use_reflectance_panels=True, use_sun_sensor= args.sunsens)
+    chunk.calibrateReflectance(use_reflectance_panels=True, use_sun_sensor=args.sunsens)
+    print(f"Calibrated reflectance using reflectance panels: {True} and sun sensor: {args.sunsens}")
+    logging.info(f"Calibrated reflectance using reflectance panels: {True} and sun sensor: {args.sunsens}")
 
-    #
-    # Align Photos
-    #
-    # change camera position accuracy to 0.1 m
+    
+    # Align Photos and optimize camera alignment
     chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
-
-    # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
+        # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8 # to be set below
     # Quality:  High, Reference Preselection: Source
-    chunk.matchPhotos(downscale= quality3 , generic_preselection=True, reference_preselection=True,
-                      reference_preselection_mode=Metashape.ReferencePreselectionSource, tiepoint_limit= 10000)
-    doc.save()
+
+    chunk.matchPhotos(downscale=quality3, generic_preselection=True, reference_preselection=True, reference_preselection_mode=Metashape.ReferencePreselectionSource, tiepoint_limit=10000)
     print("Aligning cameras")
     chunk.alignCameras()
     doc.save()
-
-    # Gradual selection based on reprojection error
-    print("Gradual selection for reprojection error...")
-    f = Metashape.TiePoints.Filter()
-    threshold = 0.5
-    f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
-    f.removePoints(threshold)
-    doc.save()
-
-    # Optimize camera alignment by adjusting intrinsic parameters
+    
+    # Gradual selection and optimization
     print("Optimizing camera alignment...")
+    f = Metashape.TiePoints.Filter()
+    f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+    f.removePoints(0.5)
+    # Optimize camera alignment by adjusting intrinsic parameters
     chunk.optimizeCameras(fit_f=True, fit_cx=True, fit_cy=True, fit_b1=True, fit_b2=True, adaptive_fitting=False)
     doc.save()
-
-    # copy bounding box from rgb chunk
-
-    #copyBoundingBox(CHUNK_RGB, CHUNK_MULTISPEC)
+    
+    # Reset bounding box region
     chunk.resetRegion()
-    #
+    
     # Build and export orthomosaic
-    #
     if use_model:
-        # Import P1 model for use in orthorectification
-        smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
-        model_file = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_smooth_" + str(smooth_val) + ".obj")
+        model_file = Path(proj_file).parent / f"{Path(proj_file).stem}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
         chunk.importModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
-
-        print("Build orthomosaic")
         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
-        doc.save()
-
+    
     if use_dem:
-        dem_res_xy = 0.01  # Define the resolution for DEM
-        dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_01.tif")
-        chunk.importRaster(path=str(dem_file), crs=target_crs, format=Metashape.ImageFormatTIFF)
-
-        print("Build orthomosaic")
-        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
-        doc.save()
-
-    if chunk.orthomosaic:
-        # Set resolution to 5 cm
-        res_xy = 0.05
-
-        # if multispec/ folder does not exist in MICASENSE_PATH save in project directory
-        # else save ortho in multispec/level1_proc/
-        micasense_idx = MICASENSE_PATH.find("multispec")
-        if micasense_idx == -1:
-            dir_path = Path(proj_file).parent
-            print("Cannot find " + "multispec/ folder. Saving ortho in " + str(dir_path))
-        else:
-            # create multispec/level1_proc/ folder if it does not exist
-            dir_path = Path(MICASENSE_PATH[:micasense_idx + len("multispec")]) / "level1_proc"
-            dir_path.mkdir(parents=True, exist_ok=True)
-
-        # file naming format: <projname>_multispec_ortho_<res_in_m>.tif
-        ortho_file = dir_path / (
-                Path(proj_file).stem + "_" + "multispec_ortho_" + str(res_xy).split('.')[1] + ".tif")
-
-        compression = Metashape.ImageCompression()
-        compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW  # default on Metashape
-        compression.tiff_big = True
-        compression.tiff_tiled = True
-        compression.tiff_overviews = True
-
-        chunk.exportRaster(path=str(ortho_file), resolution_x=res_xy, resolution_y=res_xy,
-                           image_format=Metashape.ImageFormatTIFF,
-                           raster_transform=Metashape.RasterTransformValue,
-                           save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
-        print("Exported orthomosaic: " + str(ortho_file))
-
-        logging.info(f"Exported multispec orthomosaic: {ortho_file}")
-        print(f"OUTPUT_ORTHO_MS: {ortho_file}")
-
-    # Export the processing report
-    report_path = dir_path / (
-                Path(proj_file).stem + "_multispec_report.pdf")
+       process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res)
+    
+    # Export Processing Report
+    report_path = Path(proj_file).parent/ f"{Path(proj_file).stem}_multispec_report.pdf"
     print(f"Exporting processing report to {report_path}...")
-    chunk.exportReport(path = str(report_path))
-
+    chunk.exportReport(path=str(report_path))
     doc.save()
     
-    # write to logfile
-
-    logging.info(f"Exported multispec report: {report_path}")
-    print(f"OUTPUT_REPORT_MS: {report_path}")
-        
     print("Multispec chunk processing complete!")
-
 
 # Write arguments to CSV file
 def write_arguments_to_csv():
@@ -843,10 +848,11 @@ def write_arguments_to_csv():
 def resume_proc():
     # Process RGB chunk if multionly is not set
     #if not args.multionly:
-    proc_rgb()
+    rgb_output = proc_rgb()
     # Process multispec chunk
-    proc_multispec()
+    proc_multispec(rgb_output)
     print("End of script")
+    #del doc
 
 # Proceed to next project
 
@@ -888,13 +894,19 @@ global MRK_PATH, MICASENSE_PATH
 
 global doc
 # Metashape project
-mask =  2 ** len(Metashape.app.enumGPUDevices()) - 1 # Set GPU mask for your device
+mask = 1 # 2 ** len(Metashape.app.enumGPUDevices()) - 1 #Ser GPU devices
 Metashape.app.gpu_mask = mask
+
+devices = Metashape.app.enumGPUDevices()
+print("Detected GPUs in Metashape:")
+for i, device in enumerate(devices):
+    logging.info(f"  GPU {i+1}: {device['name']}") # Accessing 'name' as a dictionary key
+
 doc = Metashape.Document()
 proj_file = args.proj_path
 doc.open(proj_file, read_only=False)  # Open the document in editable mode
 
-doc.read_only= False
+doc.read_only = False    #make sure the project is not read-only
 
 if doc is None:
     print("Error: Metashape document object is not initialized.")
@@ -937,10 +949,12 @@ if args.test:
     quality3 = 2 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     print("Test mode enabled: quality1 set to 4, quality2 set to 8, quality3 set to 2")
 else:
-    quality1 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-    quality2 = 2  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
+    quality1 = 0  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    quality2 = 1  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
     quality3 = 0 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-    print("Default mode: quality1 set to 1, quality2 set to 2, quality3 set to 0")
+    print("Default mode: quality1 set to 0, quality2 set to 1, quality3 set to 0")
+
+logging.info(f"Quality settings: quality1={quality1}, quality2={quality2}, quality3={quality3}")
 
 # Export blockshifted P1 positions. Not used in script. Useful for debug or to restart parts of script following any issues.
 P1_CAM_CSV_WGS84 = Path(proj_file).parent / "p1_pos_WGS84.csv"
@@ -973,6 +987,8 @@ cam_model = str(exif_tags.get('Image Model'))
 # Dual sensor (RedEdge-MX Dual: 10, RedEdge-P Dual: 11)
 # Dual sensor: If offsets are 0, exit with error.
 MS_GIMBAL2_OFFSET = offset_dict[cam_model]['Dual']
+
+
 
 
 # Used to find chunks in proc_*

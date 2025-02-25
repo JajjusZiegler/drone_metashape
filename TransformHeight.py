@@ -4,24 +4,24 @@ import pyproj  # Import pyproj
 
 def convert_height(easting, northing, ellip_height, geoid_path, input_crs, target_crs):
     try:
-        print(f"Trying to open geoid file: {geoid_path}")
+        #print(f"Trying to open geoid file: {geoid_path}")
         with rasterio.open(geoid_path) as dataset:
-            print(f"Successfully opened geoid file: {geoid_path}")
-            print(f"Sampling coordinates (CH1903+): Easting={easting}, Northing={northing}")
+            #print(f"Successfully opened geoid file: {geoid_path}")
+            #print(f"Sampling coordinates (CH1903+): Easting={easting}, Northing={northing}")
 
             # Coordinate Transformation using pyproj
             transformer = pyproj.Transformer.from_crs(input_crs, target_crs, always_xy=True)
             lon, lat = transformer.transform(easting, northing)
-            print(f"Transformed coordinates (WGS 84 - approximate): Longitude={lon}, Latitude={lat}")
+            #print(f"Transformed coordinates (WGS 84 - approximate): Longitude={lon}, Latitude={lat}")
 
-            print("Using dataset.sample() WITHOUT resampling argument")
+            #print("Using dataset.sample() WITHOUT resampling argument")
             # Sample using TRANSFORMED coordinates (lon, lat)
             for val in dataset.sample([(lon, lat)]):
-                print(f"Raw value from dataset.sample(): {val}")
+                #print(f"Raw value from dataset.sample(): {val}")
                 geoid_undulation = val[0]
-                print(f"Extracted geoid_undulation: {geoid_undulation}")
+                #print(f"Extracted geoid_undulation: {geoid_undulation}")
                 ortho_height = ellip_height - geoid_undulation
-                print(f"Calculated ortho_height: {ortho_height}")
+                #print(f"Calculated ortho_height: {ortho_height}")
                 return ortho_height
     except Exception as e:
         print(f"Error processing coordinates ({easting}, {northing}): {e}")
@@ -64,9 +64,9 @@ def process_csv(input_file, output_file, geoid_path):
     except Exception as e:
         print(f"Error processing CSV: {e}")
 
-# Example usage with your geoid TIFF path
-process_csv(
-    input_file=r"U:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder\Test1\20240808\interpolated_micasense_pos.csv",
-    output_file=r"U:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder\Test1\20240808\interpolated_micasense_pos_correted_height.csv",
-    geoid_path=r"U:\working_package_2\2024_dronecampaign\02_processing\geoid\ch_swisstopo_chgeo2004_ETRS89_LN02.tif"
-)
+# # Example usage with your geoid TIFF path
+# process_csv(
+#     input_file=r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder\Test1\20240808\interpolated_micasense_pos.csv",
+#     output_file=r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder\Test1\20240808\interpolated_micasense_pos_correted_height.csv",
+#     geoid_path=r"M:\working_package_2\2024_dronecampaign\02_processing\geoid\ch_swisstopo_chgeo2004_ETRS89_LN02.tif"
+#     )

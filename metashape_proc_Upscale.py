@@ -345,6 +345,7 @@ def proc_rgb():
         chunk.remove(low_img_qual)
     doc.save()
 
+    
     #
     # GPS/INS offset
     #

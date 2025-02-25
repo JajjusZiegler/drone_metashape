@@ -30,3 +30,22 @@
 2025-02-04 16:31:35,558 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test.xlsx
 2025-02-04 16:31:35,565 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_data.csv
 2025-02-04 16:31:35,565 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_multispectral_data.csv
+2025-02-07 11:41:04,426 - ERROR - Error reading Excel file: Missing optional dependency 'openpyxl'.  Use pip or conda to install openpyxl.
+2025-02-07 11:41:04,426 - ERROR - Script failed: Missing optional dependency 'openpyxl'.  Use pip or conda to install openpyxl.
+2025-02-07 11:41:19,550 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test.xlsx
+2025-02-07 11:41:19,567 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_data.csv
+2025-02-07 11:41:19,567 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_multispectral_data.csv
+2025-02-07 11:42:27,717 - ERROR - Error reading Excel file: Missing optional dependency 'openpyxl'.  Use pip or conda to install openpyxl.
+2025-02-07 11:42:27,717 - ERROR - Script failed: Missing optional dependency 'openpyxl'.  Use pip or conda to install openpyxl.
+2025-02-07 11:42:55,251 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test.xlsx
+2025-02-07 11:42:55,274 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_data.csv
+2025-02-07 11:42:55,274 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_multispectral_data.csv
+2025-02-07 11:45:46,369 - INFO - Successfully read sheet 1 from m:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test.xlsx
+2025-02-07 11:45:46,386 - INFO - CSV file saved at: m:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_RGBandMulti_data.csv
+2025-02-07 11:45:46,391 - INFO - CSV file saved at: m:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test_multispectral_data.csv
+2025-02-17 16:09:01,306 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx
+2025-02-17 16:09:01,393 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_RGBandMulti_data.csv
+2025-02-17 16:09:01,421 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_multispectral_data.csv
+2025-02-17 16:33:04,095 - INFO - Successfully read sheet 1 from M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx
+2025-02-17 16:33:04,123 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_RGBandMulti_data.csv
+2025-02-17 16:33:04,129 - INFO - CSV file saved at: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters_multispectral_data.csv

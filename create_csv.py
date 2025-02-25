@@ -64,7 +64,7 @@ def save_to_csv(df: pd.DataFrame, output_path: str):
 
 if __name__ == "__main__":
     # Define file paths
-    excel_filepath = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_test.xlsx"
+    excel_filepath = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx"
     
     # Generate output file paths based on the input file name
     base_name = os.path.splitext(os.path.basename(excel_filepath))[0]
