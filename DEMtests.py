@@ -609,9 +609,9 @@ def proc_rgb():
     
         
         if METASHAPE_V2_PLUS:
-            chunk.buildDem(source_data=Metashape.PointCloudData, interpolation=Metashape.DisabledInterpolation) # DisabledInterpolation for full resolution
+            chunk.buildDem(source_data=Metashape.PointCloudData, interpolation=Metashape.EnabledInterpolation) # DisabledInterpolation for full resolution
         else:
-            chunk.buildDem(source_data=Metashape.DenseCloudData, interpolation=Metashape.DisabledInterpolation) # DisabledInterpolation for full resolution
+            chunk.buildDem(source_data=Metashape.DenseCloudData, interpolation=Metashape.EnabledInterpolation) # DisabledInterpolation for full resolution
         doc.save()
 
         dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_full_res.tif")
@@ -620,7 +620,7 @@ def proc_rgb():
         #include test variable for debugging:
 
         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
-        chunk.exportRaster(path=str(Path(proj_file).parent / (Path(proj_file).stem + "_rgb_ortho_fullresdem_1cm.pdf")), resolution_x=ortho_res, resolution_y=ortho_res,)
+        chunk.exportRaster(path=str(Path(proj_file).parent / (Path(proj_file).stem + "_rgb_ortho_fullresdem_1cm.tif")), resolution_x=ortho_res, resolution_y=ortho_res,)
 
         rgb_dem_files =export_rgb_dem_ortho(chunk, proj_file, dem_res, ortho_res)
 

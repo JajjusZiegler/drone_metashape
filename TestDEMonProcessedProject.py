@@ -31,7 +31,7 @@ import importlib
 # This script assumes the project file is in this directory or a subdirectory.
 ###############################################################################
 
-BASE_DIR = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder\Test2\20240708"  # <------- UPDATE THIS
+BASE_DIR = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TetsDEMresolution1\Davos_LWF1\20240815"  # <------- UPDATE THIS
 
 use_model = False  # Using DEM for orthorectification as requested
 use_dem = True
@@ -77,16 +77,15 @@ def setup_logging(project_path):
     return log_file
 
 
-def export_rgb_dem_ortho(chunk, proj_file, dem_resolutions):
+def export_rgb_dem_ortho(chunk, proj_file, dem_resolutions, ortho_resolution):
     """
     Exports DEMs at different resolutions, imports them back, and builds corresponding RGB orthomosaics.
     """
     compression = Metashape.ImageCompression()
-    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
+    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW  # default on Metashape
     compression.tiff_big = True
     compression.tiff_tiled = True
     compression.tiff_overviews = True
-
     print(f"--- Processing RGB Chunk: {chunk.label} for DEM and Orthomosaic at different resolutions ---")
 
     dem_files_rgb = {}
@@ -95,22 +94,27 @@ def export_rgb_dem_ortho(chunk, proj_file, dem_resolutions):
         dem_res_cm = round(dem_res_meters * 100)
 
         print(f"  Setting elevation key for DEM resolution {dem_res_meters}m")
-        chunk.elevation = chunk.elevations[0]  # Ensuring correct resolution assignment
 
         dem_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_dem_{dem_res_cm}cm.tif")
 
-        res = float(dem_res_meters)
+        res_m = float(dem_res_meters)
+
+        chunk.buildDem(source_data=Metashape.PointCloudData, interpolation=Metashape.EnabledInterpolation, resolution=res_m, replace_asset=False)  #
+
 
         print(f"  Exporting RGB DEM at resolution {dem_res_meters}m ({dem_res_cm}cm)...")
+        logging.info(f"Exporting RGB DEM at resolution {dem_res_meters}m ({dem_res_cm}cm) for orthorectification in chunk {chunk.label}")
+        
         chunk.exportRaster(
             path=str(dem_file),
             source_data=Metashape.ElevationData,
             image_format=Metashape.ImageFormatTIFF,
             image_compression=compression,
-            resolution=res
+            resolution=res_m
         )
         dem_files_rgb[dem_res_meters] = dem_file
         print(f"  Exported RGB DEM: {dem_file}")
+        logging.info(f"Exported RGB DEM at resolution {dem_res_meters}m: {dem_file}")
 
         # Import DEM back into the RGB chunk
         print(f"  Importing DEM {dem_file} back into RGB chunk...")
@@ -123,12 +127,14 @@ def export_rgb_dem_ortho(chunk, proj_file, dem_resolutions):
         chunk.buildOrthomosaic(
             surface_data=Metashape.DataSource.ElevationData,
             refine_seamlines=True,
-            fill_holes=False,
-            blending_mode=Metashape.BlendingMode.DisabledBlending,
-            resolution= float(0.1) # 10cm resolution
+            fill_holes=True,
+            blending_mode=Metashape.BlendingMode.MosaicBlending,
+            resolution= float(ortho_resolution) # User-defined ortho resolution in function arguments
         )
 
-        ortho_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_ortho_dem{dem_res_cm}cm.tif")
+        logging.info(f"Built RGB Orthomosaic using imported DEM ({dem_res_cm}cm) for orthorectification in chunk {chunk.label} with parameters: surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=True, blending_mode=Metashape.BlendingMode.MosaicBlending")
+        
+        ortho_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_ortho_{int(ortho_resolution * 100)}cm_dem{int(res_m * 100)}cm.tif") # Added dem resolution to ortho filename
 
         print(f"  Exporting RGB Orthomosaic...")
         chunk.exportRaster(
@@ -143,7 +149,7 @@ def export_rgb_dem_ortho(chunk, proj_file, dem_resolutions):
     return dem_files_rgb
 
 
-def process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files):
+def process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_resolution):
     """
     Loads RGB DEMs into the multispec chunk and builds multispec orthomosaics for each DEM.
     """
@@ -164,20 +170,22 @@ def process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files):
     #     chunk.buildDenseCloud(quality=Metashape.DenseCloudQuality.Medium)
 
     for dem_res, dem_file in rgb_dem_files.items():
+        dem_res_cm = round(dem_res * 100)
+        ortho_resolution_cm = int(ortho_resolution * 100)
         print(f"  Loading RGB DEM at resolution {dem_res}m into Multispec Chunk: {chunk.label}")
         chunk.elevation = None # Clear existing elevation data
         chunk.importRaster(path=str(dem_file), crs=chunk.crs, format=Metashape.ImageFormatTIFF)
         print(f"  Loaded DEM: {dem_file}")
 
         print(f"  Building Multispec Orthomosaic using DEM at resolution {dem_res}m for chunk: {chunk.label}")
-        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=False, blending_mode=Metashape.BlendingMode.DisabledBlending,
-            resolution= float(0.2)) # 20cm resolution
+        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=True, blending_mode=Metashape.BlendingMode.MosaicBlending,
+            resolution= float(ortho_resolution)) # User-defined ortho resolution in fuction arguments
 
-        ortho_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_ortho_{int(dem_res * 100)}cm_dem{int(dem_res * 100)}cm.tif") # Added dem resolution to ortho filename
+        ortho_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_ortho_{ortho_resolution_cm}cm_dem{dem_res_cm}cm.tif") # Added dem resolution to ortho filename
         chunk.exportRaster(path=str(ortho_file),
                              image_format=Metashape.ImageFormatTIFF, save_alpha=False,
                              source_data=Metashape.OrthomosaicData, image_compression=compression)
-        print(f"  Exported Multispec Orthomosaic using DEM at resolution {dem_res}m in chunk {chunk.label}: {ortho_file}")
+        logging.info(f"  Exported Multispec Orthomosaic at resolution {ortho_resolution} using DEM at resolution {dem_res}m for orthorectification in chunk {chunk.label}: {ortho_file}")
 
     print(f"--- Completed Multispec Chunk: {chunk.label} processing using RGB DEMs ---")
 
@@ -187,7 +195,8 @@ def process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files):
 ###############################################################################
 if __name__ == '__main__':
     doc = Metashape.Document()
-    proj_file = os.path.join(BASE_DIR, "metashape_project_Test2_20240708.psx")
+    proj_file = os.path.join(BASE_DIR, "metashape_project_Davos_LWF_20240815.psx")
+
 
     # Try opening the project explicitly
     if not os.path.exists(proj_file):
@@ -211,20 +220,44 @@ if __name__ == '__main__':
     for chunk_name in check_chunk_list:
         if chunk_name not in dict_chunks:
             raise ValueError(f"Chunk '{chunk_name}' not found in the Metashape project. Check chunk names.")
+        
+    
+    compression = Metashape.ImageCompression()
+    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
+    compression.tiff_big = True
+    compression.tiff_tiled = True
+    compression.tiff_overviews = True
 
     # Retrieve chunks safely
     chunk_rgb = dict_chunks[CHUNK_RGB]
     chunk_multispec = dict_chunks[CHUNK_MULTISPEC]
 
-    dem_resolutions_test = [0.1, 0.2, 0.5, 3]  # Resolutions to test
+    rgb_res = 0.01
+    multispec_res = 0.05
 
+    chunk = doc.findChunk(dict_chunks[CHUNK_RGB])
+
+    dem_resolutions_test = [0.05,0.1, 0.2,0.3, 0.5]  # Resolutions to test
+
+    #chunk.buildDem(source_data=Metashape.PointCloudData, interpolation=Metashape.EnabledInterpolation ) # DisabledInterpolation for full resolution
+    doc.save()
+
+    dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_full_res.tif")
+
+    #chunk.exportRaster(path=str(dem_file), source_data=Metashape.ElevationData, image_format=Metashape.ImageFormatTIFF, image_compression=compression)
+        #include test variable for debugging:
+
+    #chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
+    #chunk.exportRaster(path=str(Path(proj_file).parent / (Path(proj_file).stem + "_rgb_ortho_fullresdem_1cm.tif")), resolution_x=rgb_res, resolution_y=rgb_res)
+    #chunk.importRaster(path=str(dem_file), crs=chunk.crs, format=Metashape.ImageFormatTIFF)
+        
     # Process RGB Chunk - Export DEMs and RGB Orthomosaics
-    rgb_dem_files = export_rgb_dem_ortho(chunk_rgb, proj_file, dem_resolutions_test)
+    rgb_dem_files = export_rgb_dem_ortho(chunk_rgb, proj_file, dem_resolutions_test, ortho_resolution=rgb_res)
     if not isinstance(rgb_dem_files, dict):
         raise TypeError(f"export_rgb_dem_ortho() did not return a dictionary, got {type(rgb_dem_files)} instead.")
 
     # Process Multispec Chunk - Load RGB DEMs and build Multispec Orthomosaics
-    process_multispec_ortho_from_dems(chunk_multispec, proj_file, rgb_dem_files)
+    process_multispec_ortho_from_dems(chunk_multispec, proj_file, rgb_dem_files, ortho_resolution= multispec_res)
 
     logging.info(f"----- DEM Resolution Test Script Finished -----")
     print(f"----- DEM Resolution Test Script Finished -----")

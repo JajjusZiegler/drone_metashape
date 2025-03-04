@@ -31,7 +31,7 @@ def find_files(folder: Path, extensions: Tuple[str]) -> List[str]:
     ]
 
 # Define Metashape project directory
-proj_directory = Path(r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\20250220_DEMfuntionality_Test")
+proj_directory = Path(r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects")
 
 
 # Chunk labels
