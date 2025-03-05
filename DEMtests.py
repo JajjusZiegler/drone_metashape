@@ -108,13 +108,13 @@ BASE_DIR = "M:\working_package_2\2024_dronecampaign\02_processing\metashape_proj
 
 
 
-dem_res = [0.05,0.1,0.2,0.3]  # DEM resolutions in meters. For testing set to [0.2, 0.5] . For final processing set to desired value(s). 
-ortho_res = 0.01  # Orthomosaic resolution in meters. For testing set to 0.5 or higher. For final processing set to 0.01
-
+dem_res = [0.2, 0.5]  # DEM resolutions in meters. For testing set to [0.2, 0.5] . For final processing set to desired value(s)[0.01,0.05,0.5]. 
+ortho_res = 0.5  # Orthomosaic resolution in meters. For testing set to 0.5 or higher. For final processing set to 0.01
+ortho_res_multi = 0.5 # Orthomosaic resolution for multispec chunk in meters. For testing set to 0.1 or higher. For final processing set to 0.05
 ####
 #   IMPORTANT set quality settings !
 
-use_model = True
+use_model = False
 use_dem = True
 
 ###############################################################################
@@ -779,7 +779,7 @@ def proc_multispec(rgb_dem_files):
 
     
     # Align Photos and optimize camera alignment
-    chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
+    chunk.camera_location_accuracy = Metashape.Vector((0.50, 0.50, 0.50))
         # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8 # to be set below
     # Quality:  High, Reference Preselection: Source
@@ -808,7 +808,8 @@ def proc_multispec(rgb_dem_files):
         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
     
     if use_dem:
-       process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res)
+       ortho_resolution_multi = float(ortho_res_multi)
+       process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_resolution_multi)
     
     # Export Processing Report
     report_path = Path(proj_file).parent/ f"{Path(proj_file).stem}_multispec_report.pdf"
@@ -876,7 +877,7 @@ parser.add_argument('-crs',
                     required=True)
 parser.add_argument('-multispec', help='path to multispectral level0_raw folder with raw images')
 parser.add_argument('-rgb', help='path to RGB level0_raw folder that also has the MRK files')
-parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh low/med/high', default="low")
+parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh low/med/high', default="medium")
 parser.add_argument('-drtk', help='If RGB coordinates to be blockshifted, file containing \
                                                   DRTK base station coordinates from field and AUSPOS', default=None)
 parser.add_argument('-sunsens', help='use sun sensor data for reflectance calibration', action='store_true')
