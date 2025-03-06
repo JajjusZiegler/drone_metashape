@@ -779,10 +779,10 @@ def proc_multispec(rgb_dem_files):
 
     
     # Align Photos and optimize camera alignment
-    chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
+    chunk.camera_location_accuracy = Metashape.Vector((0.50, 0.50, 0.50))
         # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8 # to be set below
-    # Quality:  High, Reference Preselection: Source
+    # Quality:  Set below, Reference Preselection: Source
 
     chunk.matchPhotos(downscale=quality3, generic_preselection=True, reference_preselection=True, reference_preselection_mode=Metashape.ReferencePreselectionSource, tiepoint_limit=10000)
     print("Aligning cameras")
@@ -808,6 +808,7 @@ def proc_multispec(rgb_dem_files):
         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
     
     if use_dem:
+       
        process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res)
     
     # Export Processing Report
@@ -876,7 +877,7 @@ parser.add_argument('-crs',
                     required=True)
 parser.add_argument('-multispec', help='path to multispectral level0_raw folder with raw images')
 parser.add_argument('-rgb', help='path to RGB level0_raw folder that also has the MRK files')
-parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh low/med/high', default="low")
+parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh low/med/high', default="medium")
 parser.add_argument('-drtk', help='If RGB coordinates to be blockshifted, file containing \
                                                   DRTK base station coordinates from field and AUSPOS', default=None)
 parser.add_argument('-sunsens', help='use sun sensor data for reflectance calibration', action='store_true')
@@ -949,8 +950,8 @@ if args.test:
     quality3 = 2 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     print("Test mode enabled: quality1 set to 4, quality2 set to 8, quality3 set to 2")
 else:
-    quality1 = 0  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-    quality2 = 1  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
+    quality1 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
+    quality2 = 2  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
     quality3 = 0 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     print("Default mode: quality1 set to 0, quality2 set to 1, quality3 set to 0")
 

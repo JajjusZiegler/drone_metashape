@@ -296,7 +296,7 @@ def scrape_metashape_files(base_dir, output_csv):
             })
 
 
-    with open(output_csv, 'w', newline='') as csvfile:
+    with open(output_csv, 'w', newline='',encoding='utf-8') as csvfile:
         fieldnames = ['date', 'site', 'rgb', 'multispec', 'psx_file', 'multispectral_ortho', 'multispectral_report', 'rgb_ortho', 'rgb_report']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -305,6 +305,6 @@ def scrape_metashape_files(base_dir, output_csv):
     print(f"Data written to {output_csv}")
 
 if __name__ == "__main__":
-    base_directory = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\metashape_proj"
-    output_csv_file = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\metashape_proj\metashape_file_paths.csv"
+    base_directory = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects"
+    output_csv_file = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\metashape_file_paths.csv"
     scrape_metashape_files(base_directory, output_csv_file)
