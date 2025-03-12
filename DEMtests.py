@@ -104,11 +104,11 @@ if int(found_version[0]) >= 2:
 # BASE DIRECTORY If you run multiple projects, update this path
 # Decoide if you want to use model or DEM or for Orthomoasaic
 ###############################################################################
-BASE_DIR = "M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TetsDEMresolution1"
+BASE_DIR = "M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects"
 
 
 
-dem_res = [0.05,0.1,0.2,0.3]  # DEM resolutions in meters. For testing set to [0.2, 0.5] . For final processing set to desired value(s). 
+dem_res = [0.05,0.3]  # DEM resolutions in meters. For testing set to [0.2, 0.5] . For final processing set to desired value(s). 
 ortho_res = 0.01  # Orthomosaic resolution in meters. For testing set to 0.5 or higher. For final processing set to 0.01
 
 ####
