@@ -110,11 +110,11 @@ BASE_DIR = "M:\working_package_2\2024_dronecampaign\02_processing\metashape_proj
 
 dem_res = [0.05,0.3]  # DEM resolutions in meters. For testing set to [0.2, 0.5] . For final processing set to desired value(s). 
 ortho_res = 0.01  # Orthomosaic resolution in meters. For testing set to 0.5 or higher. For final processing set to 0.01
-
+ortho_res_multi = 0.05 # Orthomosaic resolution for multispec chunk in meters. For testing set to 0.1 or higher. For final processing set to 0.05
 ####
 #   IMPORTANT set quality settings !
 
-use_model = True
+use_model = False
 use_dem = True
 
 ###############################################################################
@@ -808,7 +808,6 @@ def proc_multispec(rgb_dem_files):
         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
     
     if use_dem:
-       
        process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res)
     
     # Export Processing Report

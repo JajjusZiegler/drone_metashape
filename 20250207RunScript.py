@@ -104,7 +104,7 @@ with open(csv_file_path, mode='r', newline='', encoding='utf-8') as csv_file: # 
             update_csv_row(csv_file_path, project_path, {}, 'error_missing_args', initial_fieldnames) # Pass initial_fieldnames
             continue
 
-        cmd.extend(["-proj_path", row['project_path']])
+        cmd.extend(["-proj_path", row['project_path']]) # Pass project path as argument
         cmd.extend(["-date", row['date']])
         cmd.extend(["-site", row['site']])
         cmd.extend(["-crs", HARDCODED_CRS])
