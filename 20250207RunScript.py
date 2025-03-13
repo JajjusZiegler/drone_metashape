@@ -108,7 +108,7 @@ with open(csv_file_path, mode='r', newline='', encoding='utf-8') as csv_file: # 
         cmd.extend(["-date", row['date']])
         cmd.extend(["-site", row['site']])
         cmd.extend(["-crs", HARDCODED_CRS])
-        cmd.extend(["-smooth", "low"]) # smoothing level
+        cmd.extend(["-smooth", ",medium"]) # smoothing level
 
         if row.get('multispec'):
             cmd.extend(["-multispec", row['multispec']])
