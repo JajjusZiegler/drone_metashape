@@ -613,16 +613,16 @@ def proc_rgb():
 
     
     if use_dem:
-        if chunk.elevation:
-            print("Skipping DEM generation as it already exists.")
-        else:
 
-            print("Build DEM at full resolution. ")
-            if METASHAPE_V2_PLUS:
-                chunk.buildDem(source_data=Metashape.PointCloudData, interpolation=Metashape.EnabledInterpolation) # DisabledInterpolation for full resolution
+            if chunk.elevation:
+                print("Skipping DEM generation as it already exists.")
             else:
-                chunk.buildDem(source_data=Metashape.DenseCloudData, interpolation=Metashape.EnabledInterpolation) # DisabledInterpolation for full resolution
-            doc.save()
+                print("Build DEM at full resolution. ")
+                if METASHAPE_V2_PLUS:
+                    chunk.buildDem(source_data=Metashape.PointCloudData, interpolation=Metashape.EnabledInterpolation) # DisabledInterpolation for full resolution
+                else:
+                    chunk.buildDem(source_data=Metashape.DenseCloudData, interpolation=Metashape.EnabledInterpolation) # DisabledInterpolation for full resolution
+                doc.save()
 
             dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_full_res.tif")
 
@@ -923,6 +923,12 @@ for i, device in enumerate(devices):
     logging.info(f"  GPU {i+1}: {device['name']}") # Accessing 'name' as a dictionary key
 
 doc = Metashape.Document()
+
+# set logging location:
+
+Metashape.app.settings.log_enable = True
+Metashape.app.settings.log_path = Path(args.proj_path).parent/ "metashape_log.txt"
+# Open the Metashape project
 proj_file = args.proj_path
 doc.open(proj_file, read_only=False)  # Open the document in editable mode
 
