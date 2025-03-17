@@ -825,7 +825,7 @@ def proc_multispec(rgb_dem_files):
     
     if use_dem:
        
-       process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res)
+       process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res_multi)
     
     # Export Processing Report
     report_path = Path(proj_file).parent/ f"{Path(proj_file).stem}_multispec_report.pdf"
