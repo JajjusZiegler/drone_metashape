@@ -64,9 +64,9 @@ def process_csv(input_file, output_file, geoid_path):
     except Exception as e:
         print(f"Error processing CSV: {e}")
 
-# # Example usage with your geoid TIFF path
-# process_csv(
-#     input_file=r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder\Test1\20240808\interpolated_micasense_pos.csv",
-#     output_file=r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder\Test1\20240808\interpolated_micasense_pos_correted_height.csv",
-#     geoid_path=r"M:\working_package_2\2024_dronecampaign\02_processing\geoid\ch_swisstopo_chgeo2004_ETRS89_LN02.tif"
-#     
+# Example usage with your geoid TIFF path
+process_csv(
+    input_file=r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder\Test1\20240808\interpolated_micasense_pos.csv",
+    output_file=r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\TestFolder\Test1\20240808\interpolated_micasense_pos_correted_height.csv",
+    geoid_path=r"M:\working_package_2\2024_dronecampaign\02_processing\geoid\ch_swisstopo_chgeo2004_ETRS89_LN02.tif"
+)

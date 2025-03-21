@@ -76,16 +76,17 @@ import os
 import sys
 import exifread
 from collections import defaultdict
-from upd_micasense_pos import ret_micasense_pos
+from upd_micasense_pos_filename import ret_micasense_pos
 import importlib
-import upd_micasense_pos
+import upd_micasense_pos_filename
 import csv
 import logging
 from datetime import datetime
 import TransformHeight
+import requests
 
 
-importlib.reload(upd_micasense_pos)
+importlib.reload(upd_micasense_pos_filename)
 from pathlib import Path
 
 
@@ -108,7 +109,7 @@ BASE_DIR = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_pro
 
 
 
-dem_res = [0.05,0.3]  # DEM resolutions in meters. For testing set to [0.2, 0.5] . For final processing set to desired value(s). 
+dem_res = [0.05]  # DEM resolutions in meters. For testing set to [0.2, 0.5] . For final processing set to desired value(s). 
 ortho_res = 0.01  # Orthomosaic resolution in meters. For testing set to 0.5 or higher. For final processing set to 0.01
 ortho_res_multi = 0.05 # Orthomosaic resolution for multispec chunk in meters. For testing set to 0.1 or higher. For final processing set to 0.05
 ####
@@ -498,6 +499,7 @@ def proc_rgb():
     low_img_qual = [camera for camera in chunk.cameras if (float(camera.meta["Image/Quality"]) < IMG_QUAL_THRESHOLD)]
     if low_img_qual:
         print("Removing cameras with Image Quality < %.1f" % IMG_QUAL_THRESHOLD)
+        logging.info("Removing cameras with Image Quality < %.1f" % IMG_QUAL_THRESHOLD)
         chunk.remove(low_img_qual)
     doc.save()
 
@@ -512,7 +514,8 @@ def proc_rgb():
     #
     # Align Photos
     #
-    print("Aligning Cameras")
+    
+
     # change camera position accuracy to 0.1 m
     chunk.camera_location_accuracy = Metashape.Vector((0.10, 0.10, 0.10))
 
@@ -528,6 +531,8 @@ def proc_rgb():
             chunk.matchPhotos(downscale=quality1, generic_preselection=False, reference_preselection=True,
                               reference_preselection_mode=Metashape.ReferencePreselectionSource)
             chunk.alignCameras()
+            print("Aligning Cameras")
+            logging.info("Aligning Cameras")
             doc.save()
 
     # Gradual selection based on reprojection error
@@ -719,10 +724,11 @@ def proc_multispec(rgb_dem_files):
     global P1_shift_vec
     P1_shift_vec = np.array([0.0, 0.0, 0.0])
     print(f"Interpolating Micasense position based on P1 with blockshift {P1_shift_vec}")
+    logging.info(f"Interpolating Micasense position based on P1 with blockshift {P1_shift_vec}")
     
     # Interpolate Micasense positions and apply transformations
     ret_micasense_pos(MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
-    TransformHeight.process_csv(input_file=str(MICASENSE_CAM_CSV), output_file=str(MICASENSE_CAM_CSV_UPDATED), geoid_path=str(GEOID_PATH))
+    #TransformHeight.process_csv(input_file=str(MICASENSE_CAM_CSV), output_file=str(MICASENSE_CAM_CSV_UPDATED), geoid_path=str(GEOID_PATH))
     
     # Load updated positions into Metashape
     chunk.importReference(str(MICASENSE_CAM_CSV_UPDATED), format=Metashape.ReferenceFormatCSV, columns="nxyz",
@@ -756,6 +762,7 @@ def proc_multispec(rgb_dem_files):
     for s in chunk.sensors:
         if set_primary in s.label:
             print(f"Setting primary channel to {s.label}")
+            logging.info(f"Setting primary channel to {s.label}")
             chunk.primary_channel = s.layer_index
             break
     
@@ -765,6 +772,7 @@ def proc_multispec(rgb_dem_files):
     
     # Configure raster transformation for reflectance calculation
     print("Updating Raster Transform for relative reflectance")
+    logging.info("Updating Raster Transform for relative reflectance")
     num_bands = len(chunk.sensors)
     raster_transform_formula = [f"B{band}/32768" for band in range(1, num_bands + 1) if cam_model != 'RedEdge-P' or band != (5 if num_bands >= 10 else 3)]
     chunk.raster_transform.formula = raster_transform_formula
@@ -781,6 +789,7 @@ def proc_multispec(rgb_dem_files):
     low_img_qual = [camera.master for camera in chunk.cameras if (float(camera.meta["Image/Quality"]) < 0.5)]
     if low_img_qual:
         print("Removing cameras with Image Quality < %.1f" % 0.5)
+        logging.info("Removing cameras with Image Quality < %.1f" % 0.5)
         chunk.remove(list(set(low_img_qual)))
     doc.save()
     
@@ -799,9 +808,11 @@ def proc_multispec(rgb_dem_files):
     for camera in chunk.cameras:
         if camera.transform:
             print(f"Camera {camera.label} is aligned")
+            logging.info(f"Camera {camera.label} is aligned")
         else:
             chunk.matchPhotos(downscale=quality3, generic_preselection=True, reference_preselection=True, reference_preselection_mode=Metashape.ReferencePreselectionSource, tiepoint_limit=10000)
             print("Aligning cameras")
+            logging.info("Aligning cameras")
             chunk.alignCameras()
             doc.save()
     
@@ -867,10 +878,9 @@ def resume_proc():
     #if not args.multionly:
     rgb_output = proc_rgb()
     # Process multispec chunk
-    if rgb_output:
-        proc_multispec(rgb_output)
-    else:
-        return
+    
+    proc_multispec(rgb_output)
+    
     print("End of script")
     #del doc
 
@@ -927,7 +937,7 @@ doc = Metashape.Document()
 # set logging location:
 
 Metashape.app.settings.log_enable = True
-Metashape.app.settings.log_path = Path(args.proj_path).parent/ "metashape_log.txt"
+Metashape.app.settings.log_path = str(Path(args.proj_path).parent / "metashape_log.txt")
 # Open the Metashape project
 proj_file = args.proj_path
 doc.open(proj_file, read_only=False)  # Open the document in editable mode
@@ -1035,3 +1045,5 @@ finally:
     doc.save()
     logging.info("Project saved")
 print("DONE WITH PROJ:", proj_file)
+
+
