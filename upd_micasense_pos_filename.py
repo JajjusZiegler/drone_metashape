@@ -226,7 +226,7 @@ def get_P1_position(MRK_file, file_count):
         P1_pos_mrk.append([lat, lon, ellh])
 
     
-def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_file, P1_shift_vec):
+def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder, image_suffix, epsg_crs, out_file, P1_shift_vec):
     """
     Parameters
     ----------
@@ -282,8 +282,11 @@ def ret_micasense_pos(mrk_folder, micasense_folder, image_suffix, epsg_crs, out_
     transformer = transf_group.transformers[min_step_idx]
 
     # List of MicaSense master band images
-    os.chdir(micasense_folder)
-    filelist = glob.glob("**/IMG*_" + str(image_suffix)+".tif", recursive=True)
+    if absolute_micasense_file_list:
+        filelist = absolute_micasense_file_list
+    else:
+        os.chdir(micasense_folder)
+        filelist = glob.glob("**/IMG*_" + str(image_suffix)+".tif", recursive=True)
     
     # Get timestamp of MicaSense images using exifread
     for file in filelist:

@@ -363,6 +363,34 @@ def process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res
 
     print(f"--- Completed Multispec Chunk: {chunk.label} processing using RGB DEMs ---")
 
+def get_master_band_paths_by_suffix(chunk, suffix="_6.tif"):
+    """
+    Retrieves a list of file paths for all cameras in the given Metashape chunk,
+    filtering for paths that end with the specified suffix.
+
+    Args:
+        chunk: The Metashape.Chunk object.
+        suffix (str, optional): The file name suffix to filter for.
+                                 Defaults to "_6.tif".
+
+    Returns:
+        A list of strings, where each string is the file path of a camera
+        whose path ends with the specified suffix.
+        Returns an empty list if the chunk is None or no matching paths are found.
+    """
+    if not chunk:
+        print("Error: Input chunk is None.")
+        return []
+
+    master_band_paths = []
+    for camera in chunk.cameras:
+        if camera.photo and camera.photo.path.endswith(suffix):
+            master_band_paths.append(camera.photo.path)
+        elif camera.photo:
+            pass  # Ignore paths that don't match the suffix
+        else:
+            print(f"Warning: Camera '{camera.label}' has no associated photo path.")
+    return master_band_paths
 
 def proc_rgb():
     """
@@ -726,8 +754,12 @@ def proc_multispec(rgb_dem_files):
     print(f"Interpolating Micasense position based on P1 with blockshift {P1_shift_vec}")
     logging.info(f"Interpolating Micasense position based on P1 with blockshift {P1_shift_vec}")
     
+    # Get master camera paths for Micasense images
+    micasense_master_paths = get_master_band_paths_by_suffix(chunk, f"_{img_suffix_master}.tif")
+
+
     # Interpolate Micasense positions and apply transformations
-    ret_micasense_pos(MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
+    ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
     #TransformHeight.process_csv(input_file=str(MICASENSE_CAM_CSV), output_file=str(MICASENSE_CAM_CSV_UPDATED), geoid_path=str(GEOID_PATH))
     
     # Load updated positions into Metashape

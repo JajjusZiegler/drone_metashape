@@ -24,7 +24,7 @@ def check_output_files_exist(project_path):
 
     project_dir = Path(project_path)
 
-    output_file_patterns = ["*_rgb_ortho_*.tif", "*_multispec_ortho_*.tif", "*_rgb_report.pdf", "*_multispec_report.pdf", "*.psx"]
+    output_file_patterns = ["**_rgb_ortho_**.tif", "**_multispec_ortho_**.tif", "*_rgb_report.pdf", "*_multispec_report.pdf", "**.psx"]
 
     all_patterns_found = True
 
