@@ -574,7 +574,7 @@ def proc_rgb():
     # Optimise Cameras
     #
     # Optimize camera alignment by adjusting intrinsic parameters
-    print("Optimizing camera alignment...")
+    logging.info("Optimizing camera alignment...")
     chunk.optimizeCameras(fit_f=True, fit_cx=True, fit_cy=True, fit_b1=True, fit_b2=True, adaptive_fitting=False)
     doc.save()
 
@@ -584,7 +584,7 @@ def proc_rgb():
     # check if exists and reuse depthmap? # reuse_depth=True below
     # downscale: ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
     if chunk.point_cloud:
-        print("Skipping point cloud generation as it already exists.")
+        logging.info("Skipping point cloud generation as it already exists.")
     else:  
         logging.info("Building dense cloud in RGB chunk...")
         print("Build dense cloud")
@@ -606,9 +606,9 @@ def proc_rgb():
     if use_model:
 
         if chunk.model:
-            print("Skipping model generation as it already exists.")
+            logging.info(f"Skipping model generation as it already exists.")
         else:
-            print("Build mesh")
+            logging.info(f"Build mesh")
             if METASHAPE_V2_PLUS:
                 chunk.buildModel(surface_type=Metashape.HeightField, source_data=Metashape.PointCloudData,
                                  face_count=Metashape.MediumFaceCount)
@@ -625,6 +625,9 @@ def proc_rgb():
             chunk.smoothModel(smooth_val)
             # Export model for use in micasense chunk
             model_file = Path(proj_file).parent / f"{Path(proj_file).stem}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
+
+            logging.info(f"Exporting smoothed model to build Orthomosaic in Multispectral chunk: {model_file}")
+
             chunk.exportModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
             # build Orthomoasaic from Model data
             chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
@@ -648,22 +651,24 @@ def proc_rgb():
     if use_dem:
 
             if chunk.elevation:
-                print("Skipping DEM generation as it already exists.")
+                logging.info("Skipping DEM generation and full resolution Orthomosaic as it already exists.")
             else:
                 print("Build DEM at full resolution. ")
                 if METASHAPE_V2_PLUS:
                     chunk.buildDem(source_data=Metashape.PointCloudData, interpolation=Metashape.EnabledInterpolation) # DisabledInterpolation for full resolution
                 else:
                     chunk.buildDem(source_data=Metashape.DenseCloudData, interpolation=Metashape.EnabledInterpolation) # DisabledInterpolation for full resolution
-                doc.save()
+                    chunk.elevation = chunk.elevations[0]  # Ensuring correct resolution assignment
 
-            dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_full_res.tif")
+                    dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_full_res.tif")
 
-            chunk.exportRaster(path=str(dem_file), source_data=Metashape.ElevationData, image_format=Metashape.ImageFormatTIFF, image_compression=compression)
-            #include test variable for debugging:
+                    chunk.exportRaster(path=str(dem_file), source_data=Metashape.ElevationData, image_format=Metashape.ImageFormatTIFF, image_compression=compression)
+                    #include test variable for debugging:
 
-            chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
-            chunk.exportRaster(path=str(Path(proj_file).parent / (Path(proj_file).stem + "_rgb_ortho_fullresdem_1cm.tif")), resolution_x=ortho_res, resolution_y=ortho_res,)
+                    chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
+                    chunk.exportRaster(path=str(Path(proj_file).parent / (Path(proj_file).stem + "_rgb_ortho_fullresdem_1cm.tif")), resolution_x=ortho_res, resolution_y=ortho_res,)
+                    doc.save()
+            chunk.elevation = chunk.elevations[0]  # Ensuring correct resolution assignment
 
             rgb_dem_files =export_rgb_dem_ortho(chunk, proj_file, dem_res, ortho_res)
 
@@ -840,7 +845,7 @@ def proc_multispec(rgb_dem_files):
     for camera in chunk.cameras:
         if camera.transform:
             print(f"Camera {camera.label} is aligned")
-            logging.info(f"Camera {camera.label} is aligned")
+           
         else:
             chunk.matchPhotos(downscale=quality3, generic_preselection=True, reference_preselection=True, reference_preselection_mode=Metashape.ReferencePreselectionSource, tiepoint_limit=10000)
             print("Aligning cameras")
@@ -910,8 +915,14 @@ def resume_proc():
     #if not args.multionly:
     rgb_output = proc_rgb()
     # Process multispec chunk
-    
-    proc_multispec(rgb_output)
+    if rgb_output:
+        proc_multispec(rgb_output)
+    else:
+        logging.info("Error: RGB processing failed. Set Multispec input seperately.")
+        rgb_dem_list = {0.05: Path(proj_file).parent / (Path(proj_file).stem + "_rgb_dem_5cm.tif")}
+        logging.info("Using default DEM  for multispec processing.")
+
+        proc_multispec(rgb_dem_list) 
     
     print("End of script")
     #del doc
