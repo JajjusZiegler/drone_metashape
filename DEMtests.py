@@ -768,7 +768,7 @@ def proc_multispec(rgb_dem_files):
     #TransformHeight.process_csv(input_file=str(MICASENSE_CAM_CSV), output_file=str(MICASENSE_CAM_CSV_UPDATED), geoid_path=str(GEOID_PATH))
     
     # Load updated positions into Metashape
-    chunk.importReference(str(MICASENSE_CAM_CSV_UPDATED), format=Metashape.ReferenceFormatCSV, columns="nxyz",
+    chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
                           delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
     chunk.crs = target_crs
     doc.save()
