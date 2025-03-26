@@ -4,13 +4,13 @@ import os
 from upd_micasense_pos_filename import ret_micasense_pos
 
 # --- Configuration ---
-mrk_folder = r"M:\working_package_2\2024_dronecampaign\01_data\P1\Pfynwald\20240823"
+mrk_folder = r"M:\working_package_2\2024_dronecampaign\01_data\dronetest\P1Data\DJI_202408080937_002_p1micasense60mtest"
 # micasense_folder is no longer directly used for finding files
-micasense_folder = r"M:\working_package_2\2024_dronecampaign\01_data\Micasense\Pfynwald\20240823"
-master_band_paths_file = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Pfynwald\20240823\master_band_paths.txt"  # Path to the text file containing master band paths
+micasense_folder = r"M:\working_package_2\2024_dronecampaign\01_data\dronetest\MicasenseData\fullset"
+master_band_paths_file = r"C:\Users\admin\Desktop\DroneStuff\master_band_paths.txt"  # Path to the text file containing master band paths
 image_suffix = 6  # Assuming master band suffix is part of the filename (e.g., IMG_XXXX_6.tif)
 epsg_crs = 2056  # Example EPSG code
-output_csv = "output_micasense_pos.csv"
+output_csv = r"C:\Users\admin\Desktop\DroneStuff\output_micasense_pos.csv"
 P1_shift_vec = [0, 0, 0]  # No shift applied
 # --- End Configuration ---
 

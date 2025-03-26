@@ -550,18 +550,22 @@ def proc_rgb():
     # # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # # Quality:  High, Reference Preselection: Source
+    aligned = any(camera.transform for camera in chunk.cameras)  # Check if any camera is aligned
 
-    for camera in chunk.cameras:
-        if camera.transform:
-            print(f"Camera {camera.label} is aligned")
-        else:
-            print(f"Camera {camera.label} is not aligned")
-            chunk.matchPhotos(downscale=quality1, generic_preselection=False, reference_preselection=True,
-                              reference_preselection_mode=Metashape.ReferencePreselectionSource)
-            chunk.alignCameras()
-            print("Aligning Cameras")
-            logging.info("Aligning Cameras")
-            doc.save()
+    if aligned:
+        print("Cameras are already aligned")
+        logging.info("Cameras are already aligned")
+    else:
+        print("Aligning cameras")
+        logging.info("Aligning cameras")
+        chunk.matchPhotos(
+            downscale=quality1,
+            generic_preselection=False,
+            reference_preselection=True,
+            reference_preselection_mode=Metashape.ReferencePreselectionSource
+        )
+        chunk.alignCameras()
+        doc.save()
 
     # Gradual selection based on reprojection error
     print("Gradual selection for reprojection error...")
@@ -760,7 +764,7 @@ def proc_multispec(rgb_dem_files):
     logging.info(f"Interpolating Micasense position based on P1 with blockshift {P1_shift_vec}")
     
     # Get master camera paths for Micasense images
-    micasense_master_paths = get_master_band_paths_by_suffix(chunk, f"_{img_suffix_master}.tif")
+    micasense_master_paths = get_master_band_paths_by_suffix(chunk, suffix = "_6.tif")
 
 
     # Interpolate Micasense positions and apply transformations
@@ -842,16 +846,22 @@ def proc_multispec(rgb_dem_files):
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8 # to be set below
     # Quality:  Set below, Reference Preselection: Source
 
-    for camera in chunk.cameras:
-        if camera.transform:
-            print(f"Camera {camera.label} is aligned")
-           
-        else:
-            chunk.matchPhotos(downscale=quality3, generic_preselection=True, reference_preselection=True, reference_preselection_mode=Metashape.ReferencePreselectionSource, tiepoint_limit=10000)
-            print("Aligning cameras")
-            logging.info("Aligning cameras")
-            chunk.alignCameras()
-            doc.save()
+    aligned_multi = any(camera.transform for camera in chunk.cameras)  # Check if any camera is aligned
+
+    if aligned_multi:
+        print("Cameras are already aligned")
+        logging.info("Cameras are already aligned")
+    else:
+        print("Aligning cameras")
+        logging.info("Aligning cameras")
+        chunk.matchPhotos(
+            downscale=quality3,
+            generic_preselection=True,
+            reference_preselection=True,
+            reference_preselection_mode=Metashape.ReferencePreselectionSource,
+            tiepoint_limit=10000
+        )
+        chunk.alignCameras()
     
     # Gradual selection and optimization
     print("Optimizing camera alignment...")

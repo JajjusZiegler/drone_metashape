@@ -27,6 +27,7 @@ import datetime
 import requests
 from pyproj.transformer import TransformerGroup
 from datetime import datetime, timedelta
+import logging
 
 
 ###############################################################################
@@ -288,6 +289,9 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
         os.chdir(micasense_folder)
         filelist = glob.glob("**/IMG*_" + str(image_suffix)+".tif", recursive=True)
     
+    if not filelist:
+        logging.warning("No matching images found in the specified folder.")
+    
     # Get timestamp of MicaSense images using exifread
     for file in filelist:
         f = open(file, 'rb')
@@ -407,6 +411,7 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
     out_frame = open(out_file, 'w')
     # write header row
     rec = ("Label, Easting, Northing, Ellip Height\n")
+    print("Writing to file: ", rec)
     out_frame.write(rec) 
     
     count = 0
@@ -493,7 +498,8 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
                         rec = ("%s, %10.6f, %10.6f, %10.4f\n" % \
                                 (image_name, mica_pos[pos_index][0], mica_pos[pos_index][1], upd_micasense_pos[2]))
                         
-        out_frame.write(rec) 
+        print("Writing to file: ", rec)                
+        out_frame.write(rec)
         count = count + 1
         
     # Close the CSV file
