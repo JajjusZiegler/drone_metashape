@@ -31,7 +31,7 @@ def find_files(folder: Path, extensions: Tuple[str]) -> List[str]:
     ]
 
 # Define Metashape project directory
-proj_directory = Path(r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects")
+proj_directory = Path(r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Old\20250327_test2")
 
 
 # Chunk labels
@@ -52,14 +52,10 @@ def process_projects(input_csv, output_csv):
     """
     Processes projects from the input CSV and writes results to the output CSV.
     """
-    with open(input_csv, 'r', newline='', encoding='utf-8') as infile, open(output_csv, 'a', newline='', encoding='utf-8') as outfile: # Added encoding='utf-8' for both files        
+    all_results = []  # Store results in a list
+
+    with open(input_csv, 'r', newline='', encoding='utf-8') as infile:
         reader = csv.DictReader(infile)
-        writer = csv.writer(outfile)
-
-        # Write header if output file is empty
-        if outfile.tell() == 0:
-            writer.writerow(['date', 'site', 'rgb', 'multispec', 'sunsens', 'project_path', 'image_load_status'])
-
         for row in reader:
             # Extract required columns
             date = row['date']
@@ -82,29 +78,31 @@ def process_projects(input_csv, output_csv):
                 if proj_file.exists():
                     print(f"Skipping existing project: {proj_file}")
                     result[6] = 'skipped (exists)'
-                    writer.writerow(result)
-                    continue
+                else:
+                    # Create new Metashape document
+                    doc = Metashape.Document()
+                    proj_file.parent.mkdir(parents=True, exist_ok=True)
 
-                # Create new Metashape document
-                doc = Metashape.Document()
-                proj_file.parent.mkdir(parents=True, exist_ok=True)
+                    # Add images to project
+                    add_images_to_project(doc, rgb_path, multispec_path, proj_file)
 
-                # Add images to project
-                add_images_to_project(doc, rgb_path, multispec_path, proj_file)
-
-                # Save project
-                doc.save(path=str(proj_file))
-                print(f"Created project: {proj_file}")
-                result[6] = 'success'
+                    # Save project
+                    doc.save(path=str(proj_file))
+                    print(f"Created project: {proj_file}")
+                    result[6] = 'success'
 
             except Exception as e:
                 print(f"Error processing {site}/{date}: {str(e)}")
                 result[6] = f'error: {str(e)}'
 
             finally:
-                # Write result to CSV
-                writer.writerow(result)
+                all_results.append(result)  # Store the result
 
+    # Write all results to the output CSV at the end
+    with open(output_csv, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerow(['date', 'site', 'rgb', 'multispec', 'sunsens', 'project_path', 'image_load_status'])
+        writer.writerows(all_results)
 
 def add_images_to_project(doc, rgb_path, multispec_path, proj_file):
     """
@@ -180,6 +178,6 @@ if __name__ == "__main__":
 
     # Generate output path automatically
     input_path = Path(args.input_csv)
-    output_csv = proj_directory.with_name(input_path.stem + "project_created.csv")
+    output_csv = proj_directory / (input_path.stem + "_project_created.csv")
     
     process_projects(args.input_csv, str(output_csv))

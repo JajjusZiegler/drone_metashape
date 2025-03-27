@@ -109,6 +109,7 @@ BASE_DIR = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_pro
 
 
 
+
 dem_res = [0.05]  # DEM resolutions in meters. For testing set to [0.2, 0.5] . For final processing set to desired value(s). 
 ortho_res = 0.01  # Orthomosaic resolution in meters. For testing set to 0.5 or higher. For final processing set to 0.01
 ortho_res_multi = 0.05 # Orthomosaic resolution for multispec chunk in meters. For testing set to 0.1 or higher. For final processing set to 0.05
@@ -148,6 +149,13 @@ offset_dict['RedEdge-M']['Dual'] = (-0.097, 0.02, -0.08)
 offset_dict['RedEdge-P']['Red'] = (0,0,0)
 offset_dict['RedEdge-P']['Dual'] = (0,0,0)
 
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+
 ###############################################################################
 # Function definitions
 ###############################################################################
@@ -164,7 +172,7 @@ def setup_logging(project_path):
         logger.handlers.clear()
     
     # File handler
-    log_file = log_dir / f"{Path(project_path).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    log_file = log_dir / f"{file_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     file_handler = logging.FileHandler(log_file)
     file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(file_formatter)
@@ -275,7 +283,7 @@ def export_rgb_dem_ortho(chunk, proj_file, dem_resolutions, ortho_resolution):
         print(f"  Setting elevation key for DEM resolution {dem_res_meters}m")
         chunk.elevation = chunk.elevations[0]  # Ensuring correct resolution assignment
 
-        dem_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_dem_{dem_res_cm}cm.tif")
+        dem_file = export_dir / f"{file_prefix}_{chunk.label}_dem_{dem_res_cm}cm.tif"
 
         res_m = float(dem_res_meters)
 
@@ -309,7 +317,7 @@ def export_rgb_dem_ortho(chunk, proj_file, dem_resolutions, ortho_resolution):
 
         logging.info(f"Built RGB Orthomosaic using imported DEM ({dem_res_cm}cm) for orthorectification in chunk {chunk.label} with parameters: surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=True, blending_mode=Metashape.BlendingMode.MosaicBlending")
         
-        ortho_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_ortho_{int(ortho_resolution * 100)}cm_dem{int(res_m * 100)}cm.tif") # Added dem resolution to ortho filename
+        ortho_file = export_dir / f"{file_prefix}_{chunk.label}_ortho_{int(ortho_resolution * 100)}cm_dem{int(res_m * 100)}cm.tif" # Added dem resolution to ortho filename
 
         print(f"  Exporting RGB Orthomosaic...")
         chunk.exportRaster(
@@ -317,7 +325,8 @@ def export_rgb_dem_ortho(chunk, proj_file, dem_resolutions, ortho_resolution):
             image_format=Metashape.ImageFormatTIFF,
             save_alpha=False,
             source_data=Metashape.OrthomosaicData,
-            image_compression=compression
+            image_compression=compression,
+            resolution= float(ortho_resolution)
         )
         print(f"  Exported RGB Orthomosaic: {ortho_file}")
 
@@ -355,13 +364,57 @@ def process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res
         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=True, blending_mode=Metashape.BlendingMode.MosaicBlending,
             resolution= float(ortho_resolution)) # User-defined ortho resolution in fuction arguments
 
-        ortho_file = Path(proj_file).parent / (Path(proj_file).stem + f"_{chunk.label}_ortho_{ortho_resolution_cm}cm_dem{dem_res_cm}cm.tif") # Added dem resolution to ortho filename
+        ortho_file = export_dir / f"{file_prefix}_{chunk.label}_ortho_{ortho_resolution_cm}cm_dem{dem_res_cm}cm.tif" # Added dem resolution to ortho filename
         chunk.exportRaster(path=str(ortho_file),
                              image_format=Metashape.ImageFormatTIFF, save_alpha=False,
-                             source_data=Metashape.OrthomosaicData, image_compression=compression)
+                             source_data=Metashape.OrthomosaicData, image_compression=compression, resolution= float(ortho_resolution))
         logging.info(f"  Exported Multispec Orthomosaic at resolution {ortho_resolution} using DEM at resolution {dem_res}m for orthorectification in chunk {chunk.label}: {ortho_file}")
 
     print(f"--- Completed Multispec Chunk: {chunk.label} processing using RGB DEMs ---")
+
+def remove_assets(chunk, asset_type):
+    """
+    Remove specified asset type from a given chunk in Metashape.
+    
+    Parameters:
+        chunk (Metashape.Chunk): The chunk from which to remove assets.
+        asset_type (str): The type of asset to remove, or "rgb" for default behavior.
+    """
+    
+    if asset_type == "rgb":
+        # Keep only the first elevation, first orthomosaic, and last model
+        if len(chunk.elevations) > 1:
+            chunk.elevations = [chunk.elevations[0]]
+        
+        if len(chunk.orthomosaics) > 1:
+            chunk.orthomosaics = [chunk.orthomosaics[0]]
+        
+        if len(chunk.models) > 1:
+            chunk.models = [chunk.models[-1]]
+        
+        print("RGB preset applied: Keeping first elevation, first orthomosaic, last model.")
+        logging.info("Cleaning up rgb chunk: Keeping first elevation, first orthomosaic, last model.")
+        return
+    
+    asset_removal_map = {
+        "Key Points": lambda c: c.tie_points and c.tie_points.removeKeypoints(),
+        "Tie Points": lambda c: setattr(c, "tie_points", None),
+        "Depth Maps": lambda c: c.remove(c.depth_maps_sets),
+        "Point Clouds": lambda c: c.remove(c.point_clouds),
+        "Models": lambda c: c.remove(c.models),
+        "Tiled Models": lambda c: c.remove(c.tiled_models),
+        "DEMs": lambda c: c.remove(c.elevations),
+        "Orthophotos": lambda c: [o.removeOrthophotos() for o in c.orthomosaics],
+        "Orthomosaics": lambda c: c.remove(c.orthomosaics),
+        "Shapes": lambda c: setattr(c, "shapes", None),
+    }
+    
+    if asset_type in asset_removal_map:
+        asset_removal_map[asset_type](chunk)
+        print(f"{asset_type} removed from {chunk.label}")
+    else:
+        print(f"Unknown asset type: {asset_type}")
+
 
 def get_master_band_paths_by_suffix(chunk, suffix="_6.tif"):
     """
@@ -628,7 +681,7 @@ def proc_rgb():
             smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
             chunk.smoothModel(smooth_val)
             # Export model for use in micasense chunk
-            model_file = Path(proj_file).parent / f"{Path(proj_file).stem}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
+            model_file = export_dir / f"{file_prefix}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
 
             logging.info(f"Exporting smoothed model to build Orthomosaic in Multispectral chunk: {model_file}")
 
@@ -636,9 +689,8 @@ def proc_rgb():
             # build Orthomoasaic from Model data
             chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
             
-            ortho_file = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_model_ortho_01.tif")
-
-            chunk.exportRaster(path=str(ortho_file), resolution_x=ortho_res, resolution_y=ortho_res,
+            ortho_file = export_dir / f"{file_prefix}_rgb_model_ortho_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.tif"
+            chunk.exportRaster(path=str(ortho_file), resolution = float(ortho_res),
                                    image_format=Metashape.ImageFormatTIFF,
                                    save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
             print("Exported orthomosaic " + str(ortho_file))
@@ -664,19 +716,20 @@ def proc_rgb():
                     chunk.buildDem(source_data=Metashape.DenseCloudData, interpolation=Metashape.EnabledInterpolation) # DisabledInterpolation for full resolution
                     chunk.elevation = chunk.elevations[0]  # Ensuring correct resolution assignment
 
-                    dem_file = Path(proj_file).parent / (Path(proj_file).stem + "_dem_full_res.tif")
+                    dem_file = export_dir / f"{file_prefix}_dem_full_res.tif"
 
                     chunk.exportRaster(path=str(dem_file), source_data=Metashape.ElevationData, image_format=Metashape.ImageFormatTIFF, image_compression=compression)
                     #include test variable for debugging:
 
                     chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
-                    chunk.exportRaster(path=str(Path(proj_file).parent / (Path(proj_file).stem + "_rgb_ortho_fullresdem_1cm.tif")), resolution_x=ortho_res, resolution_y=ortho_res,)
+                    ortho_file = export_dir / f"{file_prefix}_ortho_full_res.tif"
+                    chunk.exportRaster(path=str(ortho_file),image_format=Metashape.ImageFormatTIFF, save_alpha=False, source_data=Metashape.OrthomosaicData, resolution= float(ortho_res), image_compression=compression)
                     doc.save()
             chunk.elevation = chunk.elevations[0]  # Ensuring correct resolution assignment
 
             rgb_dem_files =export_rgb_dem_ortho(chunk, proj_file, dem_res, ortho_res)
 
-            report_path = Path(proj_file).parent / (Path(proj_file).stem + "_rgb_report.pdf")
+            report_path = export_dir / f"{file_prefix}_rgb_report.pdf"
 
             print(f"Exporting processing report to {report_path}...")
             chunk.exportReport(path = str(report_path))
@@ -688,59 +741,10 @@ def proc_rgb():
             print("RGB chunk processing complete!")
 
             return rgb_dem_files #to be passed to process_multispec_ortho_from_dems
+    
+    #clean up chunk
+    remove_assets(chunk, "rgb")
         
-
-
-    # test = args.test #default is False 
-
-    # if not test:
-    #     #
-    #     # Build and export orthomosaic
-    #     #
-    #     print("Build orthomosaic")
-    #     if use_model:
-    #         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
-    #     elif use_dem:
-    #         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True)
-    #     else:
-    #         print("No valid surface data source specified for orthomosaic building.")
-    #     doc.save()
-
-    #     if chunk.orthomosaic:
-    #         # set resolution to 1 cm
-    #         res_xy = 0.01
-
-    #         # if rgb/ folder does not exist in MRK_PATH save orthomosaic in the project directory
-    #         # else save ortho in rgb/level1_proc/
-    #         p1_idx = MRK_PATH.find("rgb")
-    #         if p1_idx == -1:
-    #             dir_path = Path(proj_file).parent
-    #             print("Cannot find rgb/ folder. Saving ortho in " + str(dir_path))
-    #         else:
-    #             # create p1/level1_proc folder if it does not exist
-    #             dir_path = Path(MRK_PATH[:p1_idx + len("rgb")]) / "level1_proc"
-    #             dir_path.mkdir(parents=True, exist_ok=True)
-
-    #         # file naming format: <projname>_rgb_ortho_<res_in_m>.tif
-    #         ortho_file = dir_path / (
-    #                 Path(proj_file).stem + "_rgb_ortho_01.tif")
-
-
-    #         chunk.exportRaster(path=str(ortho_file), resolution_x=res_xy, resolution_y=res_xy,
-    #                            image_format=Metashape.ImageFormatTIFF,
-    #                            save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
-    #         print("Exported orthomosaic " + str(ortho_file))
-
-    #         logging.info(f"Exported RGB orthomosaic: {ortho_file}")
-    #         print(f"OUTPUT_ORTHO_RGB: {ortho_file}")
-
-
-    #     else:
-    #         print("Skipping orthomosaic building and exporting due to test mode.")
-
-        # Export the processing report
-
-   
 
 
 def proc_multispec(rgb_dem_files):
@@ -877,16 +881,20 @@ def proc_multispec(rgb_dem_files):
     
     # Build and export orthomosaic
     if use_model:
-        model_file = Path(proj_file).parent / f"{Path(proj_file).stem}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
+        model_file = export_dir / f"{file_prefix}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
         chunk.importModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
+        ortho_file_multi = export_dir / f"{file_prefix}_multispec_ortho_{DICT_SMOOTH_STRENGTH[args.smooth]}cm.tif"
+        chunk.exportRaster(path=str(ortho_file_multi), resolution = float(ortho_res_multi),
+                           image_format=Metashape.ImageFormatTIFF, save_alpha=False, source_data=Metashape.OrthomosaicData)
+
     
     if use_dem:
        
        process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res_multi)
     
     # Export Processing Report
-    report_path = Path(proj_file).parent/ f"{Path(proj_file).stem}_multispec_report.pdf"
+    report_path = export_dir / f"{file_prefix}_multispec_report.pdf"
     print(f"Exporting processing report to {report_path}...")
     chunk.exportReport(path=str(report_path))
     doc.save()
@@ -929,7 +937,7 @@ def resume_proc():
         proc_multispec(rgb_output)
     else:
         logging.info("Error: RGB processing failed. Set Multispec input seperately.")
-        rgb_dem_list = {0.05: Path(proj_file).parent / (Path(proj_file).stem + "_rgb_dem_5cm.tif")}
+        rgb_dem_list = {0.05: export_dir / f"{file_prefix}_rgb_dem_5cm.tif"}
         logging.info("Using default DEM  for multispec processing.")
 
         proc_multispec(rgb_dem_list) 
@@ -969,6 +977,26 @@ parser.add_argument('-multionly', help='process multispec chunk only', action='s
 global args
 args = parser.parse_args()
 
+proj_file = args.proj_path
+
+
+#Define Project Path
+project_dir = Path(proj_file).parent
+
+# Define file prefix for output files
+file_prefix = f"{args.date}_{args.site}"
+
+# Define export directory
+export_dir = project_dir / "exports"
+export_dir.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
+
+# Define output directory for reference camera positions
+reference_dir = project_dir / "references"
+reference_dir.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
+
+# Example file name : dem_file = export_dir / f"{file_prefix}_rgb_dem_{dem_res_cm}cm.tif"
+#  ---> 20210101_site_rgb_dem_5cm.tif
+
 # Initialize logging first
 setup_logging(args.proj_path)
 logging.info(f"Starting processing for project: {args.proj_path}")
@@ -989,13 +1017,21 @@ doc = Metashape.Document()
 
 # set logging location:
 
-Metashape.app.settings.log_enable = True
-Metashape.app.settings.log_path = str(Path(args.proj_path).parent / "metashape_log.txt")
+
+
 # Open the Metashape project
-proj_file = args.proj_path
+
 doc.open(proj_file, read_only=False)  # Open the document in editable mode
 
 doc.read_only = False    #make sure the project is not read-only
+
+Metashape.app.settings.log_enable = True
+log_folder = Path(args.proj_path).parent / "metashape_logs"
+log_folder.mkdir(exist_ok=True)  # Ensure the log folder exists
+log_filename = f"metashape_log_{args.date}_{args.site}.txt"
+Metashape.app.settings.log_path = str(log_folder / log_filename)
+Metashape.app.settings.save()
+logging.info(f"Metashape log path: {Metashape.app.settings.log_path}")
 
 if doc is None:
     print("Error: Metashape document object is not initialized.")
@@ -1023,6 +1059,7 @@ else:
     else:
         MICASENSE_PATH = str(MICASENSE_PATH)
 
+
 if args.drtk is not None:
     DRTK_TXT_FILE = args.drtk
     if not Path(DRTK_TXT_FILE).is_file():
@@ -1031,6 +1068,8 @@ if args.drtk is not None:
 if args.smooth not in DICT_SMOOTH_STRENGTH:
     sys.exit("Value for -smooth must be one of low, medium or high.")
 
+
+#### QUALITY SETTINGS ####
 # Set quality values for the downscale value in RGB and Multispec for testing
 if args.test:
     quality1 = 4 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
@@ -1041,22 +1080,20 @@ else:
     quality1 = 1  #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     quality2 = 2  #ultra, high, medium, low, lowest: 1, 2, 4, 8, 16
     quality3 = 0 #highest, high, medium, low, lowest: 0, 1, 2, 4, 8
-    print("Default mode: quality1 set to 0, quality2 set to 1, quality3 set to 0")
+    print(f"Default mode: quality1 set to {quality1}, quality2 set to {quality2}, quality3 set to {quality3}")
 
 logging.info(f"Quality settings: quality1={quality1}, quality2={quality2}, quality3={quality3}")
 
 # Export blockshifted P1 positions. Not used in script. Useful for debug or to restart parts of script following any issues.
-P1_CAM_CSV_WGS84 = Path(proj_file).parent / "p1_pos_WGS84.csv"
-P1_CAM_CSV_CH1903 = Path(proj_file).parent / "p1_pos_CH1903.csv"
-P1_CAM_CSV_blockshift = Path(proj_file).parent / "p1_pos_blockshift.csv"
+P1_CAM_CSV_WGS84 = reference_dir / "p1_pos_WGS84.csv"
+P1_CAM_CSV_CH1903 = reference_dir / "p1_pos_CH1903.csv"
+P1_CAM_CSV_blockshift = reference_dir / "p1_pos_blockshift.csv"
 # By default save the CSV with updated MicaSense positions in the MicaSense folder. CSV used within script.
-MICASENSE_CAM_CSV = Path(proj_file).parent / "interpolated_micasense_pos.csv"
-MICASENSE_CAM_CSV_UPDATED = Path(proj_file).parent / "interpolated_micasense_pos_updated.csv"
+MICASENSE_CAM_CSV = reference_dir / "interpolated_micasense_pos.csv"
+MICASENSE_CAM_CSV_UPDATED = reference_dir / "interpolated_micasense_pos_updated.csv"
 GEOID_PATH = r"M:\working_package_2\2024_dronecampaign\02_processing\geoid\ch_swisstopo_chgeo2004_ETRS89_LN02.tif"
 ##################
-# Add images
-##################
-# If the multionli argument is not set, add images to the project
+
 
 
 # Check that lever-arm offsets are non-zero:
