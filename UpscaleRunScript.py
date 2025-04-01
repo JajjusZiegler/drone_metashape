@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import logging
 import glob
+import datetime
 
 # Configuration (same as before)
 csv_file_path = input("Enter the path to the CSV file: ")
@@ -30,7 +31,7 @@ def setup_project_logger(project_file_path, site, date):
     consolelog_dir = logs_dir / 'consolelog'
     logs_dir.mkdir(parents=True, exist_ok=True)
     consolelog_dir.mkdir(parents=True, exist_ok=True)
-    log_file_name = f'consolelog_{site}_{date}.log'
+    log_file_name = f"consolelog_{site}_{date}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     log_file_path = consolelog_dir / log_file_name
     project_logger = logging.getLogger(f"project_{project_dir.name}_{site}_{date}")
     project_logger.setLevel(logging.DEBUG)

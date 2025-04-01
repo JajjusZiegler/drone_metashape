@@ -287,48 +287,96 @@ def export_rgb_dem_ortho(chunk, proj_file, dem_resolutions, ortho_resolution):
 
         res_m = float(dem_res_meters)
 
-        print(f"  Exporting RGB DEM at resolution {dem_res_meters}m ({dem_res_cm}cm)...")
-        chunk.exportRaster(
-            path=str(dem_file),
-            source_data=Metashape.ElevationData,
-            image_format=Metashape.ImageFormatTIFF,
-            image_compression=compression,
-            resolution=res_m
-        )
-        dem_files_rgb[dem_res_meters] = dem_file
-        print(f"  Exported RGB DEM: {dem_file}")
-        logging.info(f"Exported RGB DEM at resolution {dem_res_meters}m: {dem_file}")
-
-        # Import DEM back into the RGB chunk
-        print(f"  Importing DEM {dem_file} back into RGB chunk...")
-        chunk.elevation = None  # Clear existing elevation data
-        chunk.importRaster(path=str(dem_file), crs=chunk.crs, format=Metashape.ImageFormatTIFF)
-        print(f"  Imported DEM {dem_file}")
-
-        # Generate RGB orthomosaic using the imported DEM
-        print(f"  Building RGB Orthomosaic using imported DEM ({dem_res_cm}cm)...")
-        chunk.buildOrthomosaic(
-            surface_data=Metashape.DataSource.ElevationData,
-            refine_seamlines=True,
-            fill_holes=True,
-            blending_mode=Metashape.BlendingMode.MosaicBlending,
-            resolution= float(ortho_resolution) # User-defined ortho resolution in function arguments
-        )
-
-        logging.info(f"Built RGB Orthomosaic using imported DEM ({dem_res_cm}cm) for orthorectification in chunk {chunk.label} with parameters: surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=True, blending_mode=Metashape.BlendingMode.MosaicBlending")
-        
         ortho_file = export_dir / f"{file_prefix}_{chunk.label}_ortho_{int(ortho_resolution * 100)}cm_dem{int(res_m * 100)}cm.tif" # Added dem resolution to ortho filename
+        if ortho_file.exists():
+            print(f"  Orthomosaic file already exists: {ortho_file}. Skipping this step.")
+            logging.info(f"Orthomosaic file already exists: {ortho_file}. Skipping this step.")
+        else:
+            print(f"  Exporting RGB DEM at resolution {dem_res_meters}m ({dem_res_cm}cm)...")
+            chunk.exportRaster(
+                path=str(dem_file),
+                source_data=Metashape.ElevationData,
+                image_format=Metashape.ImageFormatTIFF,
+                image_compression=compression,
+                resolution=res_m
+            )
+            
+            print(f"  Exported RGB DEM: {dem_file}")
+            logging.info(f"Exported RGB DEM at resolution {dem_res_meters}m: {dem_file}")
 
-        print(f"  Exporting RGB Orthomosaic...")
-        chunk.exportRaster(
-            path=str(ortho_file),
-            image_format=Metashape.ImageFormatTIFF,
-            save_alpha=False,
-            source_data=Metashape.OrthomosaicData,
-            image_compression=compression,
-            resolution= float(ortho_resolution)
-        )
-        print(f"  Exported RGB Orthomosaic: {ortho_file}")
+            # Import DEM back into the RGB chunk
+            print(f"  Importing DEM {dem_file} back into RGB chunk...")
+            chunk.elevation = None  # Clear existing elevation data
+            chunk.importRaster(path=str(dem_file), crs=chunk.crs, format=Metashape.ImageFormatTIFF)
+            print(f"  Imported DEM {dem_file}")
+
+            # Generate RGB orthomosaic using the imported DEM
+            print(f"  Building RGB Orthomosaic using imported DEM ({dem_res_cm}cm)...")
+            chunk.buildOrthomosaic(
+                surface_data=Metashape.DataSource.ElevationData,
+                refine_seamlines=True,
+                fill_holes=True,
+                blending_mode=Metashape.BlendingMode.MosaicBlending,
+                resolution=float(ortho_resolution)  # User-defined ortho resolution in function arguments
+            )
+
+            logging.info(f"Built RGB Orthomosaic using imported DEM ({dem_res_cm}cm) for orthorectification in chunk {chunk.label} with parameters: surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=True, blending_mode=Metashape.BlendingMode.MosaicBlending")
+
+            print(f"  Exporting RGB Orthomosaic...")
+            chunk.exportRaster(
+                path=str(ortho_file),
+                image_format=Metashape.ImageFormatTIFF,
+                save_alpha=False,
+                source_data=Metashape.OrthomosaicData,
+                image_compression=compression
+            )
+            print(f"  Exported RGB Orthomosaic: {ortho_file}")
+        
+        # print(f"  Exporting RGB DEM at resolution {dem_res_meters}m ({dem_res_cm}cm)...")
+        # chunk.exportRaster(
+        #     path=str(dem_file),
+        #     source_data=Metashape.ElevationData,
+        #     image_format=Metashape.ImageFormatTIFF,
+        #     image_compression=compression,
+        #     resolution=res_m
+        # )
+        # dem_files_rgb[dem_res_meters] = dem_file
+        # print(f"  Exported RGB DEM: {dem_file}")
+        # logging.info(f"Exported RGB DEM at resolution {dem_res_meters}m: {dem_file}")
+
+        # # Import DEM back into the RGB chunk
+        # print(f"  Importing DEM {dem_file} back into RGB chunk...")
+        # chunk.elevation = None  # Clear existing elevation data
+        # chunk.importRaster(path=str(dem_file), crs=chunk.crs, format=Metashape.ImageFormatTIFF)
+        # print(f"  Imported DEM {dem_file}")
+
+        # # Generate RGB orthomosaic using the imported DEM
+        # print(f"  Building RGB Orthomosaic using imported DEM ({dem_res_cm}cm)...")
+        # chunk.buildOrthomosaic(
+        #     surface_data=Metashape.DataSource.ElevationData,
+        #     refine_seamlines=True,
+        #     fill_holes=True,
+        #     blending_mode=Metashape.BlendingMode.MosaicBlending,
+        #     resolution= float(ortho_resolution) # User-defined ortho resolution in function arguments
+        # )
+
+        # logging.info(f"Built RGB Orthomosaic using imported DEM ({dem_res_cm}cm) for orthorectification in chunk {chunk.label} with parameters: surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=True, blending_mode=Metashape.BlendingMode.MosaicBlending")
+        
+        # ortho_file = export_dir / f"{file_prefix}_{chunk.label}_ortho_{int(ortho_resolution * 100)}cm_dem{int(res_m * 100)}cm.tif" # Added dem resolution to ortho filename
+
+        # print(f"  Exporting RGB Orthomosaic...")
+        # chunk.exportRaster(
+        #     path=str(ortho_file),
+        #     image_format=Metashape.ImageFormatTIFF,
+        #     save_alpha=False,
+        #     source_data=Metashape.OrthomosaicData,
+        #     image_compression=compression,
+        #     resolution= float(ortho_resolution)
+        # )
+        # print(f"  Exported RGB Orthomosaic: {ortho_file}")
+
+        # Check if the orthomosaic file already exists
+
 
     return dem_files_rgb
 
@@ -357,17 +405,23 @@ def process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res
         ortho_resolution_cm = int(ortho_resolution * 100)
         print(f"  Loading RGB DEM at resolution {dem_res}m into Multispec Chunk: {chunk.label}")
         chunk.elevation = None # Clear existing elevation data
+        ortho_file = export_dir / f"{file_prefix}_{chunk.label}_ortho_{ortho_resolution_cm}cm_dem{dem_res_cm}cm.tif" # Added dem resolution to ortho filename
+
+        if ortho_file.exists():
+            print(f"  Orthomosaic file already exists: {ortho_file}. Skipping this step.")
+            logging.info(f"  Orthomosaic file already exists: {ortho_file}. Skipping this step.")
+            continue
+
         chunk.importRaster(path=str(dem_file), crs=chunk.crs, format=Metashape.ImageFormatTIFF)
         print(f"  Loaded DEM: {dem_file}")
 
         print(f"  Building Multispec Orthomosaic using DEM at resolution {dem_res}m for chunk: {chunk.label}")
         chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ElevationData, refine_seamlines=True, fill_holes=True, blending_mode=Metashape.BlendingMode.MosaicBlending,
-            resolution= float(ortho_resolution)) # User-defined ortho resolution in fuction arguments
+            resolution= float(ortho_resolution)) # User-defined ortho resolution in function arguments
 
-        ortho_file = export_dir / f"{file_prefix}_{chunk.label}_ortho_{ortho_resolution_cm}cm_dem{dem_res_cm}cm.tif" # Added dem resolution to ortho filename
         chunk.exportRaster(path=str(ortho_file),
-                             image_format=Metashape.ImageFormatTIFF, save_alpha=False,
-                             source_data=Metashape.OrthomosaicData, image_compression=compression, resolution= float(ortho_resolution))
+                     image_format=Metashape.ImageFormatTIFF, save_alpha=False,
+                     source_data=Metashape.OrthomosaicData, image_compression=compression, resolution= float(ortho_resolution))
         logging.info(f"  Exported Multispec Orthomosaic at resolution {ortho_resolution} using DEM at resolution {dem_res}m for orthorectification in chunk {chunk.label}: {ortho_file}")
 
     print(f"--- Completed Multispec Chunk: {chunk.label} processing using RGB DEMs ---")
@@ -567,16 +621,23 @@ def proc_rgb():
     else:
         P1_shift_vec = np.array([0.0, 0.0, 0.0])
 
-    doc.save()
+    #doc.save()
 
     #
     # Estimate image quality and remove cameras with quality < threshold
     #
-    if METASHAPE_V2_PLUS:
-        chunk.analyzeImages()
-    else:
-        chunk.analyzePhotos()
-    low_img_qual = []
+    analyze_done_rgb = reference_dir / "RGBanalyzeImageDone.txt"
+    
+    if not analyze_done_rgb.exists():
+        if METASHAPE_V2_PLUS:
+            chunk.analyzeImages()
+        else:
+            chunk.analyzePhotos()
+
+        # Create a marker file to indicate analyzeImages step is done
+        with open(analyze_done_rgb, 'w') as done_file:
+            done_file.write("analyzeImages step completed.\n")
+
     low_img_qual = [camera for camera in chunk.cameras if (float(camera.meta["Image/Quality"]) < IMG_QUAL_THRESHOLD)]
     if low_img_qual:
         print("Removing cameras with Image Quality < %.1f" % IMG_QUAL_THRESHOLD)
@@ -626,7 +687,7 @@ def proc_rgb():
     threshold = 0.5
     f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
     f.removePoints(threshold)
-    doc.save()
+    #doc.save()
     #
     # Optimise Cameras
     #
@@ -672,32 +733,36 @@ def proc_rgb():
             else:
                 chunk.buildModel(surface_type=Metashape.HeightField, source_data=Metashape.DenseCloudData,
                                  face_count=Metashape.MediumFaceCount)
-            doc.save()
+            #doc.save()
 
-            # Decimate and smooth mesh to use as orthorectification surface
-            # Halve face count?
-            chunk.decimateModel(face_count=len(chunk.model.faces) / 2)
-            # Smooth model
-            smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
-            chunk.smoothModel(smooth_val)
-            # Export model for use in micasense chunk
-            model_file = export_dir / f"{file_prefix}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
-
-            logging.info(f"Exporting smoothed model to build Orthomosaic in Multispectral chunk: {model_file}")
-
-            chunk.exportModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
-            # build Orthomoasaic from Model data
-            chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
-            
+            # Check if the ortho file already exists
             ortho_file = export_dir / f"{file_prefix}_rgb_model_ortho_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.tif"
-            chunk.exportRaster(path=str(ortho_file), resolution = float(ortho_res),
+            if ortho_file.exists():
+                print(f"Orthomosaic file already exists: {ortho_file}. Skipping this step.")
+                logging.info(f"Orthomosaic file already exists: {ortho_file}. Skipping this step.")
+            else:
+                # Decimate and smooth mesh to use as orthorectification surface
+                # Halve face count?
+                chunk.decimateModel(face_count=len(chunk.model.faces) / 2)
+                # Smooth model
+                smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
+                chunk.smoothModel(smooth_val)
+                # Export model for use in micasense chunk
+                model_file = export_dir / f"{file_prefix}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
+
+                logging.info(f"Exporting smoothed model to build Orthomosaic in Multispectral chunk: {model_file}")
+
+                chunk.exportModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
+                # Build Orthomosaic from Model data
+                chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
+
+                chunk.exportRaster(path=str(ortho_file), resolution=float(ortho_res),
                                    image_format=Metashape.ImageFormatTIFF,
                                    save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
-            print("Exported orthomosaic " + str(ortho_file))
+                print("Exported orthomosaic " + str(ortho_file))
 
-            logging.info(f"Exported RGB orthomosaic: {ortho_file}")
-            print(f"OUTPUT_ORTHO_RGB: {ortho_file}")
-        
+                logging.info(f"Exported RGB orthomosaic: {ortho_file}")
+                print(f"OUTPUT_ORTHO_RGB: {ortho_file}")
 
     #
     # Build DEM
@@ -731,9 +796,13 @@ def proc_rgb():
 
             report_path = export_dir / f"{file_prefix}_rgb_report.pdf"
 
-            print(f"Exporting processing report to {report_path}...")
-            chunk.exportReport(path = str(report_path))
-            doc.save()
+            if report_path.exists():
+                print(f"Report file already exists: {report_path}. Skipping this step.")
+                logging.info(f"Report file already exists: {report_path}. Skipping this step.")
+            else:
+                print(f"Exporting processing report to {report_path}...")
+                chunk.exportReport(path = str(report_path))
+                #doc.save()
 
             logging.info(f"Exported RGB report: {report_path}")
             print(f"OUTPUT_REPORT_RGB: {report_path}")
@@ -770,16 +839,45 @@ def proc_multispec(rgb_dem_files):
     # Get master camera paths for Micasense images
     micasense_master_paths = get_master_band_paths_by_suffix(chunk, suffix = "_6.tif")
 
+    # Check if the interpolated Micasense position CSV already exists
+    if Path(MICASENSE_CAM_CSV).exists():
+        try:
+            print(f"Attempting to load existing Micasense position CSV: {MICASENSE_CAM_CSV}")
+            logging.info(f"Attempting to load existing Micasense position CSV: {MICASENSE_CAM_CSV}")
+            chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
+                                  delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
+            chunk.crs = target_crs
+            #doc.save()
+            print(f"Successfully loaded existing Micasense position CSV: {MICASENSE_CAM_CSV}")
+            logging.info(f"Successfully loaded existing Micasense position CSV: {MICASENSE_CAM_CSV}")
+        except Exception as e:
+            print(f"Failed to load existing Micasense position CSV: {MICASENSE_CAM_CSV}. Error: {e}")
+            logging.warning(f"Failed to load existing Micasense position CSV: {MICASENSE_CAM_CSV}. Error: {e}")
+            print("Falling back to ret_micasense_pos function to generate positions.")
+            logging.info("Falling back to ret_micasense_pos function to generate positions.")
+            ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
+            chunk.crs = target_crs
+            #doc.save()
 
-    # Interpolate Micasense positions and apply transformations
-    ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
-    #TransformHeight.process_csv(input_file=str(MICASENSE_CAM_CSV), output_file=str(MICASENSE_CAM_CSV_UPDATED), geoid_path=str(GEOID_PATH))
+    else:
+        print(f"Micasense position CSV does not exist: {MICASENSE_CAM_CSV}")
+        logging.info(f"Micasense position CSV does not exist: {MICASENSE_CAM_CSV}")
+        print("Using ret_micasense_pos function to generate positions.")
+        logging.info("Using ret_micasense_pos function to generate positions.")
+        ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
+        chunk.crs = target_crs
+        doc.save()
+
+    # # Interpolate Micasense positions and apply transformations
+    # ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
+    # #TransformHeight.process_csv(input_file=str(MICASENSE_CAM_CSV), output_file=str(MICASENSE_CAM_CSV_UPDATED), geoid_path=str(GEOID_PATH))
     
-    # Load updated positions into Metashape
-    chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
-                          delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
-    chunk.crs = target_crs
-    doc.save()
+    # # Load updated positions into Metashape
+    # chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
+    #                       delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
+
+    # chunk.crs = target_crs
+    # doc.save()
     
     del_camera_names = list()
 
@@ -825,23 +923,34 @@ def proc_multispec(rgb_dem_files):
     chunk.raster_transform.enabled = True
     doc.save()
     
+    analyze_done_multi = reference_dir / "MultiAnalyzeImageDone.txt"
+    
+    if not analyze_done_multi.exists():
+        if METASHAPE_V2_PLUS:
+            chunk.analyzeImages()
+        else:
+            chunk.analyzePhotos()
 
-    if METASHAPE_V2_PLUS:
-        chunk.analyzeImages()
-    else:
-        chunk.analyzePhotos()
+        # Create a marker file to indicate analyzeImages step is done
+        with open(analyze_done_multi, 'w') as done_file:
+            done_file.write("analyzeImages step completed.\n")
+
     low_img_qual = []
     low_img_qual = [camera.master for camera in chunk.cameras if (float(camera.meta["Image/Quality"]) < 0.5)]
     if low_img_qual:
         print("Removing cameras with Image Quality < %.1f" % 0.5)
         logging.info("Removing cameras with Image Quality < %.1f" % 0.5)
         chunk.remove(list(set(low_img_qual)))
-    doc.save()
+    #doc.save()
     
-    # Calibrate Reflectance
-    chunk.calibrateReflectance(use_reflectance_panels=True, use_sun_sensor=args.sunsens)
-    print(f"Calibrated reflectance using reflectance panels: {True} and sun sensor: {args.sunsens}")
-    logging.info(f"Calibrated reflectance using reflectance panels: {True} and sun sensor: {args.sunsens}")
+    calibrated = reference_dir / "MultiCalibrated.txt"
+    # Calibrate reflectance using reflectance
+    if not calibrated.exists():
+        chunk.calibrateReflectance(use_reflectance_panels=True, use_sun_sensor=args.sunsens)
+        with open(calibrated, 'w') as calibrated_file:
+            calibrated_file.write("Calibrated reflectance step completed.\n")
+        print(f"Calibrated reflectance using reflectance panels: {True} and sun sensor: {args.sunsens}")
+        logging.info(f"Calibrated reflectance using reflectance panels: {True} and sun sensor: {args.sunsens}")
 
     
     # Align Photos and optimize camera alignment
@@ -874,19 +983,25 @@ def proc_multispec(rgb_dem_files):
     f.removePoints(0.5)
     # Optimize camera alignment by adjusting intrinsic parameters
     chunk.optimizeCameras(fit_f=True, fit_cx=True, fit_cy=True, fit_b1=True, fit_b2=True, adaptive_fitting=False)
-    doc.save()
+    #doc.save()
     
     # Reset bounding box region
     chunk.resetRegion()
     
     # Build and export orthomosaic
     if use_model:
-        model_file = export_dir / f"{file_prefix}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
-        chunk.importModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
-        chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
         ortho_file_multi = export_dir / f"{file_prefix}_multispec_ortho_{DICT_SMOOTH_STRENGTH[args.smooth]}cm.tif"
-        chunk.exportRaster(path=str(ortho_file_multi), resolution = float(ortho_res_multi),
-                           image_format=Metashape.ImageFormatTIFF, save_alpha=False, source_data=Metashape.OrthomosaicData)
+        if ortho_file_multi.exists():
+            print(f"Orthomosaic file already exists: {ortho_file_multi}. Skipping this step.")
+            logging.info(f"Orthomosaic file already exists: {ortho_file_multi}. Skipping this step.")
+        else:
+            model_file = export_dir / f"{file_prefix}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
+            chunk.importModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
+            chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
+            chunk.exportRaster(path=str(ortho_file_multi), resolution=float(ortho_res_multi),
+                       image_format=Metashape.ImageFormatTIFF, save_alpha=False, source_data=Metashape.OrthomosaicData)
+            print(f"Exported multispectral orthomosaic: {ortho_file_multi}")
+            logging.info(f"Exported multispectral orthomosaic: {ortho_file_multi}")
 
     
     if use_dem:
@@ -895,8 +1010,13 @@ def proc_multispec(rgb_dem_files):
     
     # Export Processing Report
     report_path = export_dir / f"{file_prefix}_multispec_report.pdf"
-    print(f"Exporting processing report to {report_path}...")
-    chunk.exportReport(path=str(report_path))
+    if report_path.exists():
+        print(f"Processing report already exists: {report_path}. Skipping this step.")
+        logging.info(f"Processing report already exists: {report_path}. Skipping this step.")
+    else:
+        print(f"Exporting processing report to {report_path}...")
+        chunk.exportReport(path=str(report_path))
+        logging.info(f"Exported multispec report: {report_path}")
     doc.save()
     
     print("Multispec chunk processing complete!")
@@ -926,6 +1046,8 @@ def write_arguments_to_csv():
             writer.writerow(headers)  # Write headers if file is empty
         writer.writerow(row)
         print("Arguments written to CSV file.")
+
+    
 
 # Resume processing
 def resume_proc():

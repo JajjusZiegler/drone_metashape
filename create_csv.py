@@ -32,7 +32,7 @@ def clean_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         raise ValueError(f"Missing required columns in Excel sheet: {missing_cols}")
 
     # Remove triple quotes globally
-    df = df.applymap(lambda x: x.replace('"""', '') if isinstance(x, str) else x)
+    df = df.map(lambda x: x.replace('"""', '') if isinstance(x, str) else x)
 
     # Select relevant columns
     df_selected = df[['date', 'site', 'rgb', 'multispec', 'crs', 'sunsens']].copy()
@@ -64,7 +64,7 @@ def save_to_csv(df: pd.DataFrame, output_path: str):
 
 if __name__ == "__main__":
     # Define file paths
-    excel_filepath = r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\logbook_proc_parameters.xlsx"
+    excel_filepath = r"M:\working_package_2\2024_dronecampaign\02_processing\logbook_proc_parameters.xlsx"
     
     # Generate output file paths based on the input file name
     base_name = os.path.splitext(os.path.basename(excel_filepath))[0]
