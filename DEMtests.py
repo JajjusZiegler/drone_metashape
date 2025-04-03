@@ -996,6 +996,7 @@ def proc_multispec(rgb_dem_files):
         if ortho_file_multi.exists():
             print(f"Orthomosaic file already exists: {ortho_file_multi}. Skipping this step.")
             logging.info(f"Orthomosaic file already exists: {ortho_file_multi}. Skipping this step.")
+            chunk.importRaster(path=str(ortho_file_multi), crs=target_crs, format=Metashape.ImageFormatTIFF)
         else:
             model_file = export_dir / f"{file_prefix}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
             chunk.importModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
