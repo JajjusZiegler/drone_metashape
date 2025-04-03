@@ -117,7 +117,7 @@ ortho_res_multi = 0.05 # Orthomosaic resolution for multispec chunk in meters. F
 #   IMPORTANT set quality settings !
 
 use_model = True
-use_dem = True
+use_dem = False
 
 ###############################################################################
 # Constants
@@ -769,7 +769,7 @@ def proc_rgb():
     #
 
     
-    if use_dem:
+    
 
             if chunk.elevation:
                 logging.info("Skipping DEM generation and full resolution Orthomosaic as it already exists.")
@@ -790,6 +790,8 @@ def proc_rgb():
                     ortho_file = export_dir / f"{file_prefix}_ortho_full_res.tif"
                     chunk.exportRaster(path=str(ortho_file),image_format=Metashape.ImageFormatTIFF, save_alpha=False, source_data=Metashape.OrthomosaicData, resolution= float(ortho_res), image_compression=compression)
                     doc.save()
+        if use_dem:    
+            
             chunk.elevation = chunk.elevations[0]  # Ensuring correct resolution assignment
 
             rgb_dem_files =export_rgb_dem_ortho(chunk, proj_file, dem_res, ortho_res)
@@ -812,7 +814,7 @@ def proc_rgb():
             return rgb_dem_files #to be passed to process_multispec_ortho_from_dems
     
     #clean up chunk
-    remove_assets(chunk, "rgb")
+    #remove_assets(chunk, "rgb")
         
 
 
@@ -847,7 +849,7 @@ def proc_multispec(rgb_dem_files):
             chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
                                   delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
             chunk.crs = target_crs
-            #doc.save()
+            doc.save()
             print(f"Successfully loaded existing Micasense position CSV: {MICASENSE_CAM_CSV}")
             logging.info(f"Successfully loaded existing Micasense position CSV: {MICASENSE_CAM_CSV}")
         except Exception as e:
@@ -857,7 +859,7 @@ def proc_multispec(rgb_dem_files):
             logging.info("Falling back to ret_micasense_pos function to generate positions.")
             ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
             chunk.crs = target_crs
-            #doc.save()
+            doc.save()
 
     else:
         print(f"Micasense position CSV does not exist: {MICASENSE_CAM_CSV}")
@@ -941,7 +943,7 @@ def proc_multispec(rgb_dem_files):
         print("Removing cameras with Image Quality < %.1f" % 0.5)
         logging.info("Removing cameras with Image Quality < %.1f" % 0.5)
         chunk.remove(list(set(low_img_qual)))
-    #doc.save()
+    doc.save()
     
     calibrated = reference_dir / "MultiCalibrated.txt"
     # Calibrate reflectance using reflectance
@@ -983,11 +985,11 @@ def proc_multispec(rgb_dem_files):
     f.removePoints(0.5)
     # Optimize camera alignment by adjusting intrinsic parameters
     chunk.optimizeCameras(fit_f=True, fit_cx=True, fit_cy=True, fit_b1=True, fit_b2=True, adaptive_fitting=False)
-    #doc.save()
+    
     
     # Reset bounding box region
     chunk.resetRegion()
-    
+    doc.save()
     # Build and export orthomosaic
     if use_model:
         ortho_file_multi = export_dir / f"{file_prefix}_multispec_ortho_{DICT_SMOOTH_STRENGTH[args.smooth]}cm.tif"
