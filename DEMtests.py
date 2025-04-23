@@ -524,7 +524,7 @@ def proc_rgb():
     # Convert coordinate system for Lat/Lon to target projected coordinate system
 
     chunk = doc.findChunk(dict_chunks[CHUNK_RGB])
-    proj_file = doc.path
+    print(f"Project file: {proj_file}")
     blockshift_p1 = False
 
 
@@ -664,14 +664,16 @@ def proc_rgb():
     # # Downscale values per https://www.agisoft.com/forum/index.php?topic=11697.0
     # # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8
     # # Quality:  High, Reference Preselection: Source
-    aligned = any(camera.transform for camera in chunk.cameras)  # Check if any camera is aligned
+    alignment_done_rgb = reference_dir / "RGBAlignmentDone.txt"  # Corrected the typo in the filename
+    ortho_file = export_dir / f"{file_prefix}_rgb_model_ortho_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.tif"
 
-    if aligned:
-        print("Cameras are already aligned")
-        logging.info("Cameras are already aligned")
-    else:
-        print("Aligning cameras")
-        logging.info("Aligning cameras")
+
+    # Check if alignment and orthomosaic files exist
+    if not alignment_done_rgb.exists() and not ortho_file.exists():
+        print("Aligning cameras as alignment file and orthomosaic file do not exist.")
+        logging.info("Aligning cameras as alignment file and orthomosaic file do not exist.")
+        
+        # Perform image alignment
         chunk.matchPhotos(
             downscale=quality1,
             generic_preselection=False,
@@ -681,20 +683,31 @@ def proc_rgb():
         chunk.alignCameras()
         doc.save()
 
-    # Gradual selection based on reprojection error
-    print("Gradual selection for reprojection error...")
-    f = Metashape.TiePoints.Filter()
-    threshold = 0.5
-    f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
-    f.removePoints(threshold)
-    #doc.save()
-    #
-    # Optimise Cameras
-    #
-    # Optimize camera alignment by adjusting intrinsic parameters
-    logging.info("Optimizing camera alignment...")
-    chunk.optimizeCameras(fit_f=True, fit_cx=True, fit_cy=True, fit_b1=True, fit_b2=True, adaptive_fitting=False)
-    doc.save()
+            # Gradual selection based on reprojection error
+        print("Gradual selection for reprojection error...")
+        f = Metashape.TiePoints.Filter()
+        threshold = 0.5
+        f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+        f.removePoints(threshold)
+        #doc.save()
+        #
+        # Optimise Cameras
+        #
+        # Optimize camera alignment by adjusting intrinsic parameters
+        logging.info("Optimizing camera alignment...")
+        chunk.optimizeCameras(fit_f=True, fit_cx=True, fit_cy=True, fit_b1=True, fit_b2=True, adaptive_fitting=False)
+        doc.save()
+
+        # Create the alignment file to indicate alignment is complete
+        alignment_done_rgb.parent.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
+        with open(alignment_done_rgb, 'w') as done_file:
+            done_file.write("Alignment step completed.\n")
+        logging.info(f"Alignment file created: {alignment_done_rgb}")
+    else:
+        print("Skipping image alignment as alignment file or orthomosaic file already exists.")
+        logging.info("Skipping image alignment as alignment file or orthomosaic file already exists.")
+
+
 
     #
     # Build Dense Cloud
@@ -766,14 +779,10 @@ def proc_rgb():
 
     #
     # Build DEM
-    #
 
-    
-    
-
-            if chunk.elevation:
+    if chunk.elevation:
                 logging.info("Skipping DEM generation and full resolution Orthomosaic as it already exists.")
-            else:
+    else:
                 print("Build DEM at full resolution. ")
                 if METASHAPE_V2_PLUS:
                     chunk.buildDem(source_data=Metashape.PointCloudData, interpolation=Metashape.EnabledInterpolation) # DisabledInterpolation for full resolution
@@ -790,28 +799,30 @@ def proc_rgb():
                     ortho_file = export_dir / f"{file_prefix}_ortho_full_res.tif"
                     chunk.exportRaster(path=str(ortho_file),image_format=Metashape.ImageFormatTIFF, save_alpha=False, source_data=Metashape.OrthomosaicData, resolution= float(ortho_res), image_compression=compression)
                     doc.save()
-        if use_dem:    
+
+
+    if use_dem:    
             
             chunk.elevation = chunk.elevations[0]  # Ensuring correct resolution assignment
 
             rgb_dem_files =export_rgb_dem_ortho(chunk, proj_file, dem_res, ortho_res)
-
-            report_path = export_dir / f"{file_prefix}_rgb_report.pdf"
-
-            if report_path.exists():
-                print(f"Report file already exists: {report_path}. Skipping this step.")
-                logging.info(f"Report file already exists: {report_path}. Skipping this step.")
-            else:
-                print(f"Exporting processing report to {report_path}...")
-                chunk.exportReport(path = str(report_path))
-                #doc.save()
-
-            logging.info(f"Exported RGB report: {report_path}")
-            print(f"OUTPUT_REPORT_RGB: {report_path}")
-
-            print("RGB chunk processing complete!")
+   
 
             return rgb_dem_files #to be passed to process_multispec_ortho_from_dems
+    
+
+    report_path = export_dir / f"{file_prefix}_rgb_report.pdf"
+
+    if report_path.exists():
+        print(f"Report file already exists: {report_path}. Skipping this step.")
+        logging.info(f"Report file already exists: {report_path}. Skipping this step.")
+    else:
+        print(f"Exporting processing report to {report_path}...")
+        chunk.exportReport(path = str(report_path))
+        #doc.save()
+
+    logging.info(f"Exported RGB report: {report_path}")
+    print(f"OUTPUT_REPORT_RGB: {report_path}")
     
     #clean up chunk
     #remove_assets(chunk, "rgb")
@@ -854,6 +865,7 @@ def proc_multispec(rgb_dem_files):
             logging.info(f"Successfully loaded existing Micasense position CSV: {MICASENSE_CAM_CSV}")
         except Exception as e:
             print(f"Failed to load existing Micasense position CSV: {MICASENSE_CAM_CSV}. Error: {e}")
+            logging.error(f"Failed to load existing Micasense position CSV: {MICASENSE_CAM_CSV}. Exception type: {type(e).__name__}, Error: {e}", exc_info=True)
             logging.warning(f"Failed to load existing Micasense position CSV: {MICASENSE_CAM_CSV}. Error: {e}")
             print("Falling back to ret_micasense_pos function to generate positions.")
             logging.info("Falling back to ret_micasense_pos function to generate positions.")
@@ -868,8 +880,8 @@ def proc_multispec(rgb_dem_files):
         logging.info(f"Micasense position CSV does not exist: {MICASENSE_CAM_CSV}")
         print("Using ret_micasense_pos function to generate positions.")
         logging.info("Using ret_micasense_pos function to generate positions.")
-        ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
-        chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
+        ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV_UPDATED), P1_shift_vec)
+        chunk.importReference(str(MICASENSE_CAM_CSV_UPDATED), format=Metashape.ReferenceFormatCSV, columns="nxyz",
                                 delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
         chunk.crs = target_crs
         doc.save()
@@ -980,22 +992,27 @@ def proc_multispec(rgb_dem_files):
             # to account for changes in reference data or other preprocessing steps.
             reset_matches=True
         )
+        chunk.alignCameras(reset_alignment=True)
+        doc.save()
         # Resetting alignment ensures that any previously aligned cameras are realigned 
         # to account for changes in reference data or other preprocessing steps.
         alignment_done_multi.parent.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
         with open(alignment_done_multi, 'w') as done_file:
             done_file.write("Alignment of Multispectral Images step completed.\n")
+        
+            # Gradual selection and optimization
+        print("Optimizing camera alignment...")
+        f = Metashape.TiePoints.Filter()
+        f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+        f.removePoints(0.5)
+        # Optimize camera alignment by adjusting intrinsic parameters
+        chunk.optimizeCameras(fit_f=True, fit_cx=True, fit_cy=True, fit_b1=True, fit_b2=True, adaptive_fitting=False)
 
 
+    doc.save()
+    logging.info("Cameras are aligned, saving project.")
 
     
-    # Gradual selection and optimization
-    print("Optimizing camera alignment...")
-    f = Metashape.TiePoints.Filter()
-    f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
-    f.removePoints(0.5)
-    # Optimize camera alignment by adjusting intrinsic parameters
-    chunk.optimizeCameras(fit_f=True, fit_cx=True, fit_cy=True, fit_b1=True, fit_b2=True, adaptive_fitting=False)
     
     
     # Reset bounding box region
@@ -1007,7 +1024,7 @@ def proc_multispec(rgb_dem_files):
         if ortho_file_multi.exists():
             print(f"Orthomosaic file already exists: {ortho_file_multi}. Skipping this step.")
             logging.info(f"Orthomosaic file already exists: {ortho_file_multi}. Skipping this step.")
-            chunk.importRaster(path=str(ortho_file_multi), crs=target_crs, format=Metashape.ImageFormatTIFF)
+            #chunk.importRaster(path=str(ortho_file_multi), crs=target_crs, format=Metashape.ImageFormatTIFF)
         else:
             model_file = export_dir / f"{file_prefix}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
             chunk.importModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
@@ -1016,6 +1033,7 @@ def proc_multispec(rgb_dem_files):
                        image_format=Metashape.ImageFormatTIFF, save_alpha=False, source_data=Metashape.OrthomosaicData, raster_transform=Metashape.RasterTransformValue)
             print(f"Exported multispectral orthomosaic: {ortho_file_multi}")
             logging.info(f"Exported multispectral orthomosaic: {ortho_file_multi}")
+            doc.save()
 
     
     if use_dem:
@@ -1118,6 +1136,8 @@ proj_file = args.proj_path
 
 #Define Project Path
 project_dir = Path(proj_file).parent
+print(f"Using project directory: {project_dir}")
+logging.info(f"Using project directory: {project_dir}")
 
 # Define file prefix for output files
 file_prefix = f"{args.date}_{args.site}"
@@ -1268,6 +1288,8 @@ except Exception as e:
 finally:
     doc.save()
     logging.info("Project saved")
+    del doc
+    logging.info("Document properly closed")
 print("DONE WITH PROJ:", proj_file)
 
 
