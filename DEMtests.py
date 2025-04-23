@@ -421,7 +421,7 @@ def process_multispec_ortho_from_dems(chunk, proj_file, rgb_dem_files, ortho_res
 
         chunk.exportRaster(path=str(ortho_file),
                      image_format=Metashape.ImageFormatTIFF, save_alpha=False,
-                     source_data=Metashape.OrthomosaicData, image_compression=compression, resolution= float(ortho_resolution))
+                     source_data=Metashape.OrthomosaicData, image_compression=compression, resolution= float(ortho_resolution), raster_transform=Metashape.RasterTransformValue)
         logging.info(f"  Exported Multispec Orthomosaic at resolution {ortho_resolution} using DEM at resolution {dem_res}m for orthorectification in chunk {chunk.label}: {ortho_file}")
 
     print(f"--- Completed Multispec Chunk: {chunk.label} processing using RGB DEMs ---")
@@ -858,6 +858,8 @@ def proc_multispec(rgb_dem_files):
             print("Falling back to ret_micasense_pos function to generate positions.")
             logging.info("Falling back to ret_micasense_pos function to generate positions.")
             ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
+            chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
+                                  delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
             chunk.crs = target_crs
             doc.save()
 
@@ -867,6 +869,8 @@ def proc_multispec(rgb_dem_files):
         print("Using ret_micasense_pos function to generate positions.")
         logging.info("Using ret_micasense_pos function to generate positions.")
         ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
+        chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
+                                delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
         chunk.crs = target_crs
         doc.save()
 
@@ -961,12 +965,9 @@ def proc_multispec(rgb_dem_files):
     # Downscale: highest, high, medium, low, lowest: 0, 1, 2, 4, 8 # to be set below
     # Quality:  Set below, Reference Preselection: Source
 
-    aligned_multi = any(camera.transform for camera in chunk.cameras)  # Check if any camera is aligned
+    alignment_done_multi = reference_dir / "MultiAlignmenteDone.txt"
 
-    if aligned_multi:
-        print("Cameras are already aligned")
-        logging.info("Cameras are already aligned")
-    else:
+    if not alignment_done_multi.exists():
         print("Aligning cameras")
         logging.info("Aligning cameras")
         chunk.matchPhotos(
@@ -974,9 +975,19 @@ def proc_multispec(rgb_dem_files):
             generic_preselection=True,
             reference_preselection=True,
             reference_preselection_mode=Metashape.ReferencePreselectionSource,
-            tiepoint_limit=10000
+            tiepoint_limit=10000,
+            # Resetting matches ensures that any previously aligned cameras are realigned 
+            # to account for changes in reference data or other preprocessing steps.
+            reset_matches=True
         )
-        chunk.alignCameras()
+        # Resetting alignment ensures that any previously aligned cameras are realigned 
+        # to account for changes in reference data or other preprocessing steps.
+        alignment_done_multi.parent.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
+        with open(alignment_done_multi, 'w') as done_file:
+            done_file.write("Alignment of Multispectral Images step completed.\n")
+
+
+
     
     # Gradual selection and optimization
     print("Optimizing camera alignment...")
@@ -1002,7 +1013,7 @@ def proc_multispec(rgb_dem_files):
             chunk.importModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
             chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
             chunk.exportRaster(path=str(ortho_file_multi), resolution=float(ortho_res_multi),
-                       image_format=Metashape.ImageFormatTIFF, save_alpha=False, source_data=Metashape.OrthomosaicData)
+                       image_format=Metashape.ImageFormatTIFF, save_alpha=False, source_data=Metashape.OrthomosaicData, raster_transform=Metashape.RasterTransformValue)
             print(f"Exported multispectral orthomosaic: {ortho_file_multi}")
             logging.info(f"Exported multispectral orthomosaic: {ortho_file_multi}")
 
@@ -1139,8 +1150,6 @@ for i, device in enumerate(devices):
     logging.info(f"  GPU {i+1}: {device['name']}") # Accessing 'name' as a dictionary key
 
 doc = Metashape.Document()
-
-# set logging location:
 
 
 

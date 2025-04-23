@@ -90,6 +90,8 @@ def process_metashape(csv_path):
             print(f"Running ret_micasense_pos for {project_path}...")
             ret_micasense_pos(master_band_paths, rgb_path, multispec_path, "6", "2056", str(MICASENSE_CAM_CSV), P1_shift_vec)
             print(f"Processing complete for {project_path}. Output: {MICASENSE_CAM_CSV}")
+            doc.save() # Save the Metashape document after processing each project
+            del doc# Close the Metashape document after processing each project
 
 if __name__ == "__main__":
     csv_file_path = input("Enter the path to your CSV file: ").strip()
