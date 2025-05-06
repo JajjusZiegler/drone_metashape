@@ -11,3 +11,4 @@ parent_script.log
 your_log_file.log
 __pycache__/upd_micasense_pos_filename.cpython-39.pyc
 csv_creation.log
+__pycache__/ScapeFileLocations.cpython-312.pyc
