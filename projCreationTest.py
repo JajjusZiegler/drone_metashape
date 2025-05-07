@@ -2,7 +2,7 @@
 Script to process drone imagery in Metashape.
 
 Author: Your Name
-Date: YYYY-MM-DD
+Date: 2025-05-07
 
 This script reads project parameters from an input CSV file, processes the projects in Metashape,
 and writes the results to an output CSV file.
@@ -10,7 +10,8 @@ and writes the results to an output CSV file.
 Example usage:
     python metashape_proc_CreateProjects.py "M:/working_package_2/2024_dronecampaign/01_data/dronetest/processing_test/arguments_log_test3.csv"
 
-The output CSV file will be generated automatically with "_processed" appended to the input CSV filename.
+The output CSV file will be generated automatically with "_project_created" appended to the input CSV filename
+in the Upscale_Metashapeprojects directory.
 """
 
 import argparse
@@ -18,7 +19,7 @@ import csv
 import os
 from pathlib import Path
 from collections import defaultdict
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import exifread
 import Metashape
 
@@ -33,6 +34,8 @@ def find_files(folder: Path, extensions: Tuple[str]) -> List[str]:
 # Define Metashape project directory
 proj_directory = Path(r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects")
 
+# Define the root directory containing the site folders
+root_site_directory = Path(r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects")
 
 # Chunk labels
 CHUNK_RGB = "rgb"
@@ -47,6 +50,85 @@ offset_dict['RedEdge-M']['Dual'] = (-0.097, 0.02, -0.08)
 offset_dict['RedEdge-P']['Red'] = (0,0,0)
 offset_dict['RedEdge-P']['Dual'] = (0,0,0)
 
+# Define the site name mapping dictionary
+SITE_MAPPING = {
+    "Stillberg": {
+        "image_site_name": "stillberg",
+        "folder_name": "Stillberg"
+    },
+    "Pfynwald": {
+        "image_site_name": "Pfynwald",
+        "folder_name": "Pfynwald"
+    },
+    "Illgraben": {
+        "image_site_name": "Illgraben",
+        "folder_name": "Illgraben"
+    },
+    "lwf_davos": {
+        "image_site_name": "lwf_davos",
+        "folder_name": "Davos_LWF"
+    },
+    "lwf_isone": {
+        "image_site_name": "lwf_isone",
+        "folder_name": "Isone_LWF"
+    },
+    "lwf_lens": {
+        "image_site_name": "lwf_lens",
+        "folder_name": "Lens_LWF"
+    },
+    "lwf_neunkirch": {
+        "image_site_name": "lwf_neunkirch",
+        "folder_name": "Neunkirch_LWF"
+    },
+    "lwf_schänis": {
+        "image_site_name": "lwf_schänis",
+        "folder_name": "Schänis_LWF"
+    },
+    "lwf_visp": {
+        "image_site_name": "lwf_visp",
+        "folder_name": "Visp_LWF"
+    },
+    "marteloskop": {
+        "image_site_name": "marteloskop",
+        "folder_name": "Marteloskop"
+    },
+    "sagno": {
+        "image_site_name": "sagno",
+        "folder_name": "Sagno_treenet"
+    },
+    "sanasilva_50845": {
+        "image_site_name": "sanasilva_50845",
+        "folder_name": "Brüttelen_sanasilva50845"
+    },
+    "sanasilva_50877": {
+        "image_site_name": "sanasilva_50877",
+        "folder_name": "Schüpfen_sanasilva50877"
+    },
+    "treenet_salgesch": {
+        "image_site_name": "treenet_salgesch",
+        "folder_name": "Salgesch_treenet"
+    },
+    "treenet_sempach": {
+        "image_site_name": "treenet_sempach",
+        "folder_name": "Sempach_treenet"
+    },
+    "wangen_zh": {
+        "image_site_name": "wangen_zh",
+        "folder_name": "WangenBrüttisellen_treenet"
+    }
+}
+
+def find_site_folder(root_dir: Path, csv_site_name: str) -> Optional[Path]:
+    """
+    Finds the existing site folder within the root directory using the SITE_MAPPING.
+    """
+    for mapping in SITE_MAPPING.values():
+        if csv_site_name.lower() == mapping["image_site_name"].lower():
+            folder_path = root_dir / mapping["folder_name"]
+            if folder_path.is_dir():
+                return folder_path
+            break
+    return None
 
 def process_projects(input_csv, output_csv):
     """
@@ -58,18 +140,30 @@ def process_projects(input_csv, output_csv):
         reader = csv.DictReader(infile)
         for row in reader:
             # Extract required columns
-            date = row['date']
-            site = row['site']
+            date_str = row['date']
+            site_name_from_csv = row['site']
             rgb_path = Path(row['rgb'])
             multispec_path = Path(row['multispec'])
-            sunsens = row['sunsens']
+            sunsens = row['sunsens'].lower() == 'true' # Convert string to boolean
 
-            # Define project path
-            proj_file = proj_directory / site / date / f"metashape_project_{site}_{date}.psx"
+            # Find the correct site folder using the mapping
+            site_folder = find_site_folder(root_site_directory, site_name_from_csv)
+            
+            if not site_folder:
+                print(f"Warning: Could not find a matching site folder for '{site_name_from_csv}' based on the mapping. Skipping project creation.")
+                result = [
+                    date_str, site_name_from_csv, str(rgb_path), str(multispec_path), sunsens,
+                    'N/A', 'skipped (site folder not found - mapping)'
+                ]
+                all_results.append(result)
+                continue
+
+            # Define project path within the found site folder
+            proj_file = site_folder / date_str / f"metashape_project_{site_folder.name}_{date_str}.psx"
 
             # Prepare result entry
             result = [
-                date, site, str(rgb_path), str(multispec_path), sunsens,
+                date_str, site_name_from_csv, str(rgb_path), str(multispec_path), sunsens,
                 str(proj_file), 'skipped'  # Default status
             ]
 
@@ -92,7 +186,7 @@ def process_projects(input_csv, output_csv):
                     result[6] = 'success'
 
             except Exception as e:
-                print(f"Error processing {site}/{date}: {str(e)}")
+                print(f"Error processing {site_name_from_csv}/{date_str}: {str(e)}")
                 result[6] = f'error: {str(e)}'
 
             finally:
@@ -111,6 +205,7 @@ def add_images_to_project(doc, rgb_path, multispec_path, proj_file):
     print(f"Adding images to project: {proj_file}")
     print(f"RGB path: {rgb_path}")
     print(f"Multispec path: {multispec_path}")
+
     # Validate input paths
     if not rgb_path.exists():
         raise ValueError(f"RGB path not found: {rgb_path}")
@@ -141,6 +236,7 @@ def add_images_to_project(doc, rgb_path, multispec_path, proj_file):
     multispec_chunk = doc.addChunk()
     multispec_chunk.label = CHUNK_MULTISPEC
     multispec_chunk.addPhotos(micasense_images)
+    multispec_chunk.locateReflectancePanels()
 
     # Validate multispec chunk
     if len(multispec_chunk.cameras) == 0:
@@ -182,5 +278,38 @@ if __name__ == "__main__":
     # Generate output path automatically
     input_path = Path(args.input_csv)
     output_csv = proj_directory / (input_path.stem + "_project_created.csv")
-    
+
+    #process_projects(args.input_csv, str(output_csv))
+
+    # Debugging: Print the input CSV path and output CSV path
+    print(f"Input CSV: {args.input_csv}")
+    print(f"Output CSV: {output_csv}")
+
+    # Debugging: Check if the mapping works for each site in the input CSV
+    with open(args.input_csv, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        for row in reader:
+            site_name_from_csv = row['site']
+            site_folder = find_site_folder(root_site_directory, site_name_from_csv)
+            if site_folder:
+                print(f"Mapping successful for site '{site_name_from_csv}': {site_folder.name}")
+            else:
+                print(f"Mapping failed for site '{site_name_from_csv}'")
+
+    # Debugging: Print the folder structure for each site and date
+    with open(args.input_csv, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        for row in reader:
+            site_name_from_csv = row['site']
+            date_str = row['date']
+            site_folder = find_site_folder(root_site_directory, site_name_from_csv)
+            if site_folder:
+                project_folder = site_folder / date_str
+                print(f"Site folder: {site_folder}")
+                print(f"Date folder: {project_folder}")
+                print(f"Project folder: {project_folder / f'metashape_project_{site_folder.name}_{date_str}.psx'}")
+            else:
+                print(f"Mapping failed for site '{site_name_from_csv}'")
+
+
     process_projects(args.input_csv, str(output_csv))

@@ -64,10 +64,18 @@ def save_to_csv(df: pd.DataFrame, output_path: str):
 
 if __name__ == "__main__":
     # Define file paths
-    excel_filepath = r"M:\working_package_2\2024_dronecampaign\02_processing\logbook_proc_parameters.xlsx"
+    excel_filepath = input("Enter the path to the Excel file: ").strip()
+    sheet_index = int(input("Enter the sheet index (starting from 0): ").strip())
     
     # Generate output file paths based on the input file name
-    base_name = os.path.splitext(os.path.basename(excel_filepath))[0]
+    output_dir = input("Enter the output directory (leave blank to use the Excel file's directory): ").strip()
+    if not output_dir:
+        output_dir = os.path.dirname(excel_filepath)
+    else:
+        output_dir = os.path.abspath(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
+
+    base_name = input("Enter the base name for the output files: ").strip()
     output_dir = os.path.dirname(excel_filepath)
     output_rgb_multi_csv = os.path.join(output_dir, f"{base_name}_RGBandMulti_data.csv")
     output_multispec_csv = os.path.join(output_dir, f"{base_name}_multispectral_data.csv")
