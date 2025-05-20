@@ -93,6 +93,12 @@ chunk.raster_transform.calibrateRange()
 chunk.raster_transform.enabled = True
 doc.save()
 
+compression = Metashape.ImageCompression()
+compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
+compression.tiff_big = True
+compression.tiff_tiled = True
+compression.tiff_overviews = True
+
 # Ensure the reference directory exists
 reference_dir.mkdir(parents=True, exist_ok=True)
 
@@ -177,7 +183,7 @@ if not chunk.model:
     chunk.buildModel(surface_type=Metashape.Arbitrary, source_data=Metashape.PointCloudData, face_count=Metashape.MediumFaceCount)
 else:
     logging.info("Model already exists. Skipping model building step.")
-if chunk.model:
+if not chunk.model:
     smooth_strength = {'low': 50, 'medium': 100, 'high': 200}[args.smooth]
     chunk.decimateModel(face_count=len(chunk.model.faces) // 2)
     chunk.smoothModel(smooth_strength)
@@ -190,17 +196,26 @@ chunk.calibrateReflectance(use_reflectance_panels=True, use_sun_sensor=args.suns
 doc.save()
 
 # --- Orthophoto ---
-chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True, blending_mode=Metashape.MosaicBlending)
 ortho_path = export_dir / f"{args.date}_{args.site}_multispec_ortho.tif"
-chunk.exportRaster(str(ortho_path), image_format=Metashape.ImageFormatTIFF, save_alpha=False, source_data=Metashape.OrthomosaicData)
-logging.info(f"Orthophoto exported to {ortho_path}")
-print(f"OUTPUT_ORTHO_MS: {ortho_path}")
+
+if not ortho_path.exists():
+
+    chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True, blending_mode=Metashape.MosaicBlending)
+    chunk.exportRaster(str(ortho_path), image_format=Metashape.ImageFormatTIFF, save_alpha=False,image_compression=compression, source_data=Metashape.OrthomosaicData, resolution= float(0.05), raster_transform=Metashape.RasterTransformValue)
+    logging.info(f"Orthophoto exported to {ortho_path}")
+    print(f"OUTPUT_ORTHO_MS: {ortho_path}")
+else:
+    print("Orthophoto already exists. Skipping export.")
 
 # --- Report ---
 report_path = export_dir / f"{args.date}_{args.site}_multispec_report.pdf"
-chunk.exportReport(str(report_path))
-logging.info(f"Report exported to {report_path}")
-print(f"OUTPUT_REPORT_MS: {report_path}")
+
+if not report_path.exists():
+    chunk.exportReport(str(report_path))
+    logging.info(f"Report exported to {report_path}")
+    print(f"OUTPUT_REPORT_MS: {report_path}")
+else:
+    print("Report already exists. Skipping export.")
 
 # --- Save and close ---
 doc.save()
