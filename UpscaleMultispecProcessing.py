@@ -75,13 +75,19 @@ for s in chunk.sensors:
 chunk.loadReferenceExif(load_rotation=True, load_accuracy=True)
 # Define source and target coordinate systems
 SOURCE_CRS = Metashape.CoordinateSystem("EPSG::4326")  # Example CRS, replace with the correct one
+
+# Convert to projected coordinate system if necessary
 target_crs = Metashape.CoordinateSystem(f"EPSG::{args.crs}")
+current_chunk_crs = chunk.crs
 
-for camera in chunk.cameras:
-    if not camera.reference.location:
-        continue
-    camera.reference.location = Metashape.CoordinateSystem.transform(camera.reference.location, SOURCE_CRS, target_crs)
+if current_chunk_crs != target_crs: # Check if CRS is different (direct object comparison)
+    logging.info("Performing coordinate system transformation...")
 
+    for camera in chunk.cameras:
+        if not camera.reference.location:
+            continue
+        camera.reference.location = Metashape.CoordinateSystem.transform(camera.reference.location, SOURCE_CRS,
+                                                                               target_crs)
         
 # Configure raster transformation for reflectance calculation
 print("Updating Raster Transform for relative reflectance")
@@ -127,27 +133,27 @@ if not calibrated.exists():
     logging.info(f"Calibrated reflectance using reflectance panels: {True} and sun sensor: {args.sunsens}")
 
     # --- Align Photos ---
-    alignment_done_file = reference_dir / "AlignmentDone.txt"
+alignment_done_file = reference_dir / "AlignmentDone.txt"
 
-    if not alignment_done_file.exists():
+if not alignment_done_file.exists():
         print("Aligning cameras")
         logging.info("Aligning cameras")
         chunk.matchPhotos(
             downscale=0,
             generic_preselection=True,
-            reference_preselection=False,
-            tiepoint_limit=10000,
-            reset_matches=True  # Resetting matches ensures that any previously aligned cameras are realigned
+            reference_preselection=True,
+            reference_preselection_mode=Metashape.ReferencePreselectionSource
         )
-        chunk.alignCameras(reset_alignment=True)
+        chunk.alignCameras()
         doc.save()
+
 
         # Write a file to indicate alignment is done
         with open(alignment_done_file, 'w') as done_file:
             done_file.write("Alignment step completed.\n")
   
-    print("Alignment already completed. Skipping this step.")
-    logging.info("Alignment already completed. Skipping this step.")
+print("Alignment already completed. Skipping this step.")
+logging.info("Alignment already completed. Skipping this step.")
 
 # --- Dense Cloud ---
 depth_maps_done_file = reference_dir / "DepthMapsDone.txt"
@@ -191,9 +197,6 @@ if not chunk.model:
     chunk.exportModel(str(model_path))
     logging.info(f"Model exported to {model_path}")
 
-# --- Reflectance Calibration ---
-chunk.calibrateReflectance(use_reflectance_panels=True, use_sun_sensor=args.sunsens)
-doc.save()
 
 # --- Orthophoto ---
 ortho_path = export_dir / f"{args.date}_{args.site}_multispec_ortho.tif"
