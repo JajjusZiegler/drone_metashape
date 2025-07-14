@@ -11,7 +11,7 @@ import time
 
 # Configuration (same as before)
 csv_file_path = input("Enter the path to the CSV file: ")
-target_script_path = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\UpscaleMultispecProcessing.py"
+target_script_path = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\DEMtests.py"
 HARDCODED_CRS = "2056"
 TEST_FLAG_ENABLED = False
 

@@ -408,7 +408,7 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
  
         
     # Create output MicaSense position csv 
-    out_frame = open(out_file, 'w')
+    out_frame = open(out_file, 'w', encoding='utf-8')
     # write header row
     rec = ("Label, Easting, Northing, Ellip Height\n")
     print("Writing to file: ", rec)

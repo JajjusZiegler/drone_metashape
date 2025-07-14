@@ -14,7 +14,8 @@ def process_projects(input_csv):
         for row in reader:
             date = row['date']
             site = row['site']
-            proj_path = Path(row['psx_file'])
+
+            proj_path = Path(row['project_path'])
 
             try:
                 if not proj_path.exists():
