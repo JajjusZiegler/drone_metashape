@@ -11,23 +11,32 @@ def process_logbook(excel_file: str, sheet_name: str = "2025_drone_logbook") -> 
     
     df = pd.read_excel(excel_file, sheet_name=sheet_name)
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    
+    # Filter out rows with invalid dates
+    df = df.dropna(subset=["date"])
+    
     df["date_str"] = df["date"].dt.strftime("%Y%m%d")
 
     df["weather"] = df["weather"].astype(str).str.strip().str.lower()
     df["sunsens"] = df["weather"].ne("sunny no clouds")
     df["crs"] = 2056
 
-    # Clean up site and Site_list strings
+    # Clean up site strings and use site column for both name and path
     df["site"] = df["site"].astype(str).str.strip()
-    df["site_path"] = df["Site_list"].astype(str).str.strip()
+    df["site_path"] = df["site"].astype(str).str.strip()  # Use same site column for paths
 
     # Base paths
     base_rgb = Path(r"M:/working_package_2/2024_dronecampaign/01_data/P1")
     base_multi = Path(r"M:/working_package_2/2024_dronecampaign/01_data/Micasense")
 
-    # Construct file paths
-    df["rgb"] = df.apply(lambda row: str(base_rgb / row["site_path"] / row["date_str"]), axis=1)
-    df["multispec"] = df.apply(lambda row: str(base_multi / row["site_path"] / row["date_str"]), axis=1)
+    # Construct file paths - handle NaN values
+    def construct_path(base_path, site_path, date_str):
+        if pd.isna(site_path) or pd.isna(date_str) or site_path == 'nan' or date_str == 'nan':
+            return None
+        return str(base_path / site_path / date_str)
+    
+    df["rgb"] = df.apply(lambda row: construct_path(base_rgb, row["site_path"], row["date_str"]), axis=1)
+    df["multispec"] = df.apply(lambda row: construct_path(base_multi, row["site_path"], row["date_str"]), axis=1)
 
     return df
 

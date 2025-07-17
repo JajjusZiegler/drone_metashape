@@ -13,3 +13,16 @@ __pycache__/upd_micasense_pos_filename.cpython-39.pyc
 csv_creation.log
 __pycache__/ScapeFileLocations.cpython-312.pyc
 RunScriptMultiOnly.py
+test_encoding.py
+test_utf8.txt
+CampaignMap.html
+analyze_csv_mismatch.py
+.gitignore
+cumulative_flight.csv
+.gitignore
+FlightDurationAggregator.py
+ORS_Test.py
+.gitignore
+traveled_km.csv
+.gitignore
+__pycache__/upd_micasense_pos_filename.cpython-39.pyc

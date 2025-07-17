@@ -115,6 +115,26 @@ SITE_MAPPING = {
     "wangen_zh": {
         "image_site_name": "wangen_zh",
         "folder_name": "WangenBrüttisellen_treenet"
+    },
+    "Wangen Brüttisellen": {
+        "image_site_name": "Wangen Brüttisellen",
+        "folder_name": "WangenBrüttisellen_treenet"
+    },
+    "Sanasilva-50845": {
+        "image_site_name": "Sanasilva-50845",
+        "folder_name": "Brüttelen_sanasilva50845"
+    },
+    "Sanasilva-50877": {
+        "image_site_name": "Sanasilva-50877",
+        "folder_name": "Schüpfen_sanasilva50877"
+    },
+    "LWF-Davos": {
+        "image_site_name": "LWF-Davos",
+        "folder_name": "Davos_LWF"
+    },
+    "Martelloskop": {
+        "image_site_name": "Martelloskop",
+        "folder_name": "Marteloskop"
     }
 }
 
@@ -142,9 +162,13 @@ def process_projects(input_csv, output_csv):
             # Extract required columns
             date_str = row['date']
             site_name_from_csv = row['site']
-            rgb_path = Path(row['rgb'])
-            multispec_path = Path(row['multispec'])
+            rgb_path = Path(row['rgb'].strip('"'))  # Remove quotes if present
+            multispec_path = Path(row['multispec'].strip('"'))  # Remove quotes if present
             sunsens = row['sunsens'].lower() == 'true' # Convert string to boolean
+
+            print(f"\nProcessing: {site_name_from_csv} / {date_str}")
+            print(f"CSV RGB path: {rgb_path}")
+            print(f"CSV Multispec path: {multispec_path}")
 
             # Find the correct site folder using the mapping
             site_folder = find_site_folder(root_site_directory, site_name_from_csv)
@@ -173,6 +197,19 @@ def process_projects(input_csv, output_csv):
                     print(f"Skipping existing project: {proj_file}")
                     result[6] = 'skipped (exists)'
                 else:
+                    # Validate paths before processing
+                    if not rgb_path.exists():
+                        print(f"ERROR: RGB path does not exist: {rgb_path}")
+                        result[6] = f'error: RGB path not found'
+                        all_results.append(result)
+                        continue
+                        
+                    if not multispec_path.exists():
+                        print(f"ERROR: Multispec path does not exist: {multispec_path}")
+                        result[6] = f'error: Multispec path not found'
+                        all_results.append(result)
+                        continue
+
                     # Create new Metashape document
                     doc = Metashape.Document()
                     proj_file.parent.mkdir(parents=True, exist_ok=True)
@@ -263,6 +300,46 @@ def add_images_to_project(doc, rgb_path, multispec_path, proj_file):
             doc.remove(chunk)
             break
 
+def analyze_csv_data(input_csv):
+    """
+    Analyze the CSV data to identify mismatches between site names and paths.
+    """
+    print("=== CSV DATA ANALYSIS ===")
+    mismatches = []
+    
+    with open(input_csv, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        for row_num, row in enumerate(reader, 1):
+            site_name = row['site']
+            rgb_path = Path(row['rgb'].strip('"'))
+            multispec_path = Path(row['multispec'].strip('"'))
+            date_str = row['date']
+            
+            # Extract the actual site folder from the paths
+            rgb_site_folder = rgb_path.parts[-2] if len(rgb_path.parts) >= 2 else "UNKNOWN"
+            multispec_site_folder = multispec_path.parts[-2] if len(multispec_path.parts) >= 2 else "UNKNOWN"
+            
+            # Check if site name matches the actual folders in paths
+            site_matches_rgb = site_name.lower() == rgb_site_folder.lower()
+            site_matches_multispec = site_name.lower() == multispec_site_folder.lower()
+            
+            if not site_matches_rgb or not site_matches_multispec:
+                mismatch = {
+                    'row': row_num,
+                    'date': date_str,
+                    'csv_site': site_name,
+                    'rgb_folder': rgb_site_folder,
+                    'multispec_folder': multispec_site_folder,
+                    'rgb_matches': site_matches_rgb,
+                    'multispec_matches': site_matches_multispec
+                }
+                mismatches.append(mismatch)
+                
+                print(f"Row {row_num}: Site='{site_name}', RGB folder='{rgb_site_folder}', Multispec folder='{multispec_site_folder}'")
+    
+    print(f"\nFound {len(mismatches)} mismatched rows out of total rows")
+    return mismatches
+
 if __name__ == "__main__":
     # Check Metashape license first
     try:
@@ -284,6 +361,9 @@ if __name__ == "__main__":
     # Debugging: Print the input CSV path and output CSV path
     print(f"Input CSV: {args.input_csv}")
     print(f"Output CSV: {output_csv}")
+
+    # Analyze CSV data for mismatches
+    analyze_csv_data(args.input_csv)
 
     # Debugging: Check if the mapping works for each site in the input CSV
     with open(args.input_csv, 'r', newline='', encoding='utf-8') as infile:
