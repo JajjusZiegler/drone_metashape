@@ -150,6 +150,141 @@ def find_site_folder(root_dir: Path, csv_site_name: str) -> Optional[Path]:
             break
     return None
 
+# Available P1 (RGB) folders from the actual file system
+AVAILABLE_P1_FOLDERS = [
+    "Illgraben",
+    "lwf_davos", 
+    "lwf_isone",
+    "lwf_lens",
+    "lwf_neunkirch",
+    "lwf_schänis",
+    "lwf_visp",
+    "marteloskop",
+    "Pfynwald",
+    "sagno",
+    "sanasilva_50845",
+    "sanasilva_50877",
+    "Stillberg",
+    "treenet_salgesch",
+    "treenet_sempach",
+    "wangen_zh",
+    "XXXX_temporary",
+    "ZZZZ_leftover_vid"
+]
+
+# Available Micasense folders from the actual file system
+AVAILABLE_MICASENSE_FOLDERS = [
+    "XX_temporary",
+    "wangen_zh",
+    "lwf_neunkirch",
+    "sagno",
+    "lwf_isone",
+    "lwf_schänis",
+    "sanasilva_50877",
+    "treenet_sempach",
+    "sanasilva_50845",
+    "marteloskop",
+    "stillberg",
+    "lwf_visp",
+    "treenet_salgesch",
+    "lwf_lens",
+    "Illgraben",
+    "Pfynwald",
+    "lwf_davos",
+    "YEARMONTHDAY_copyandnameme"
+]
+
+def find_correct_rgb_path(base_rgb_path: Path, original_site: str, date_str: str) -> Optional[Path]:
+    """
+    Try to find the correct RGB path if the original doesn't exist.
+    Returns the corrected path or None if not found.
+    """
+    # First try the original path
+    original_path = base_rgb_path / original_site / date_str
+    if original_path.exists():
+        return original_path
+    
+    # Special mappings for known mismatches
+    site_corrections = {
+        "Wangen Brüttisellen": "wangen_zh",
+        "Sanasilva-50845": "sanasilva_50845",
+        "Sanasilva-50877": "sanasilva_50877",
+        "Martelloskop": "marteloskop",
+        "LWF-Davos": "lwf_davos",
+    }
+    
+    # Try the corrected site name first
+    if original_site in site_corrections:
+        corrected_site = site_corrections[original_site]
+        corrected_path = base_rgb_path / corrected_site / date_str
+        if corrected_path.exists():
+            print(f"  Found corrected RGB path: {corrected_site} (instead of {original_site})")
+            return corrected_path
+    
+    # Try to find a matching folder in the available P1 folders
+    for folder in AVAILABLE_P1_FOLDERS:
+        candidate_path = base_rgb_path / folder / date_str
+        if candidate_path.exists():
+            print(f"  Found alternative RGB path: {folder} (instead of {original_site})")
+            return candidate_path
+    
+    # If no exact date match, try to find the folder without checking date
+    for folder in AVAILABLE_P1_FOLDERS:
+        folder_path = base_rgb_path / folder
+        if folder_path.exists():
+            # Check if there are any date folders in this site folder
+            date_folders = [d for d in folder_path.iterdir() if d.is_dir() and d.name.isdigit()]
+            if date_folders:
+                print(f"  Found site folder {folder} but no matching date {date_str}")
+    
+    return None
+
+def find_correct_multispec_path(base_multispec_path: Path, original_site: str, date_str: str) -> Optional[Path]:
+    """
+    Try to find the correct Multispec path if the original doesn't exist.
+    Returns the corrected path or None if not found.
+    """
+    # First try the original path
+    original_path = base_multispec_path / original_site / date_str
+    if original_path.exists():
+        return original_path
+    
+    # Special mappings for known mismatches
+    site_corrections = {
+        "Wangen Brüttisellen": "wangen_zh",
+        "Sanasilva-50845": "sanasilva_50845",
+        "Sanasilva-50877": "sanasilva_50877",
+        "Martelloskop": "marteloskop",
+        "LWF-Davos": "lwf_davos",
+        "Stillberg": "stillberg",  # Note: lowercase in Micasense folders
+    }
+    
+    # Try the corrected site name first
+    if original_site in site_corrections:
+        corrected_site = site_corrections[original_site]
+        corrected_path = base_multispec_path / corrected_site / date_str
+        if corrected_path.exists():
+            print(f"  Found corrected Multispec path: {corrected_site} (instead of {original_site})")
+            return corrected_path
+    
+    # Try to find a matching folder in the available Micasense folders
+    for folder in AVAILABLE_MICASENSE_FOLDERS:
+        candidate_path = base_multispec_path / folder / date_str
+        if candidate_path.exists():
+            print(f"  Found alternative Multispec path: {folder} (instead of {original_site})")
+            return candidate_path
+    
+    # If no exact date match, try to find the folder without checking date
+    for folder in AVAILABLE_MICASENSE_FOLDERS:
+        folder_path = base_multispec_path / folder
+        if folder_path.exists():
+            # Check if there are any date folders in this site folder
+            date_folders = [d for d in folder_path.iterdir() if d.is_dir() and d.name.isdigit()]
+            if date_folders:
+                print(f"  Found Micasense site folder {folder} but no matching date {date_str}")
+    
+    return None
+
 def process_projects(input_csv, output_csv):
     """
     Processes projects from the input CSV and writes results to the output CSV.
@@ -200,15 +335,29 @@ def process_projects(input_csv, output_csv):
                     # Validate paths before processing
                     if not rgb_path.exists():
                         print(f"ERROR: RGB path does not exist: {rgb_path}")
-                        result[6] = f'error: RGB path not found'
-                        all_results.append(result)
-                        continue
+                        # Try to find the correct RGB path
+                        base_rgb = Path(r"M:/working_package_2/2024_dronecampaign/01_data/P1")
+                        corrected_rgb_path = find_correct_rgb_path(base_rgb, site_name_from_csv, date_str)
+                        if corrected_rgb_path:
+                            print(f"  Using corrected RGB path: {corrected_rgb_path}")
+                            rgb_path = corrected_rgb_path
+                        else:
+                            result[6] = f'error: RGB path not found'
+                            all_results.append(result)
+                            continue
                         
                     if not multispec_path.exists():
                         print(f"ERROR: Multispec path does not exist: {multispec_path}")
-                        result[6] = f'error: Multispec path not found'
-                        all_results.append(result)
-                        continue
+                        # Try to find the correct Multispec path
+                        base_multispec = Path(r"M:/working_package_2/2024_dronecampaign/01_data/Micasense")
+                        corrected_multispec_path = find_correct_multispec_path(base_multispec, site_name_from_csv, date_str)
+                        if corrected_multispec_path:
+                            print(f"  Using corrected Multispec path: {corrected_multispec_path}")
+                            multispec_path = corrected_multispec_path
+                        else:
+                            result[6] = f'error: Multispec path not found'
+                            all_results.append(result)
+                            continue
 
                     # Create new Metashape document
                     doc = Metashape.Document()
