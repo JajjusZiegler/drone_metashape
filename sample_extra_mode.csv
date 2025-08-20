@@ -1,0 +1,5 @@
+date,site,rgb,multispec,sunsens,custom_project_dir
+2024-07-15,New Forest Site,C:/data/rgb/new_forest,C:/data/multispec/new_forest,redeye,CustomForest_Analysis
+2024-07-16,Coastal Research Area,C:/data/rgb/coastal,C:/data/multispec/coastal,dual,Marine_Ecosystem_Study
+2024-07-17,Urban Canopy Study,C:/data/rgb/urban,C:/data/multispec/urban,redeye,
+2024-07-18,Mountain Vegetation,C:/data/rgb/mountain,C:/data/multispec/mountain,dual,Alpine_Research_Project

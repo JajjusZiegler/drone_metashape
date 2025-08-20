@@ -53,10 +53,11 @@ class RobustProjectCreator:
     between CSV site names and actual folder structures.
     """
     
-    def __init__(self, base_rgb_path: Path, base_multispec_path: Path, project_base_path: Path):
+    def __init__(self, base_rgb_path: Path, base_multispec_path: Path, project_base_path: Path, extra_mode: bool = False):
         self.base_rgb_path = base_rgb_path
         self.base_multispec_path = base_multispec_path
         self.project_base_path = project_base_path
+        self.extra_mode = extra_mode
         
         # Discover available folders from the actual file system
         self.available_rgb_folders = self._get_available_folders(base_rgb_path)
@@ -78,6 +79,7 @@ class RobustProjectCreator:
         self.offset_dict['RedEdge-P']['Red'] = (0,0,0)
         self.offset_dict['RedEdge-P']['Dual'] = (0,0,0)
         
+        logger.info(f"Running in {'EXTRA' if extra_mode else 'STANDARD'} mode")
         logger.info(f"Found {len(self.available_rgb_folders)} RGB folders")
         logger.info(f"Found {len(self.available_multispec_folders)} Multispec folders")
         logger.info(f"Found {len(self.available_project_folders)} Project folders")
@@ -242,7 +244,7 @@ class RobustProjectCreator:
         
         return None
     
-    def resolve_path(self, site_name: str, date_str: str, path_type: str) -> Optional[Path]:
+    def resolve_path(self, site_name: str, date_str: str, path_type: str, custom_project_dir: str = None) -> Optional[Path]:
         """
         Resolve the correct path for a given site, date, and path type.
         
@@ -250,10 +252,17 @@ class RobustProjectCreator:
             site_name: The site name from the CSV
             date_str: The date string
             path_type: 'rgb', 'multispec', or 'project'
+            custom_project_dir: Optional custom project directory name for extra mode
         
         Returns:
             The resolved Path object or None if not found
         """
+        # In extra mode, handle custom project directories and fallback to fuzzy matching
+        if self.extra_mode and path_type == "project" and custom_project_dir:
+            # Use custom project directory directly
+            return self.project_base_path / custom_project_dir / date_str
+        
+        # Standard mode or RGB/multispec paths - use existing logic
         # First try direct mapping
         if site_name in self.site_mappings:
             target_folder = self.site_mappings[site_name][path_type]
@@ -279,7 +288,7 @@ class RobustProjectCreator:
                     if candidate_path.exists():
                         return candidate_path
         
-        # If direct mapping fails, try fuzzy matching
+        # If direct mapping fails or in extra mode, try fuzzy matching
         if path_type == "rgb":
             base_path = self.base_rgb_path
             available_folders = self.available_rgb_folders
@@ -301,6 +310,14 @@ class RobustProjectCreator:
                 candidate_path = base_path / fuzzy_match / date_str
                 if candidate_path.exists():
                     return candidate_path
+        
+        # In extra mode, for project paths, create a default project directory based on site name
+        if self.extra_mode and path_type == "project":
+            # Sanitize site name for use as directory name
+            sanitized_site = site_name.replace(' ', '_').replace('-', '_').lower()
+            default_project_dir = f"{sanitized_site}_project"
+            logger.info(f"Extra mode: Creating default project directory '{default_project_dir}' for site '{site_name}'")
+            return base_path / default_project_dir / date_str
         
         logger.warning(f"Could not resolve {path_type} path for site '{site_name}', date '{date_str}'")
         return None
@@ -392,26 +409,64 @@ class RobustProjectCreator:
             logger.error("Metashape not available. Use --dry-run for validation only.")
             return
         
-        with open(input_csv, 'r', newline='', encoding='utf-8') as infile:
+        with open(input_csv, 'r', newline='', encoding='utf-8-sig') as infile:
             reader = csv.DictReader(infile)
             
+            # Debug: Print available columns
+            fieldnames = reader.fieldnames
+            logger.info(f"CSV columns found: {fieldnames}")
+            
+            # Check if we're in extra mode and have custom project directory column
+            has_custom_project_dir = 'custom_project_dir' in fieldnames if fieldnames else False
+            if self.extra_mode and has_custom_project_dir:
+                logger.info("Extra mode: Found 'custom_project_dir' column in CSV")
+            elif self.extra_mode:
+                logger.info("Extra mode: No 'custom_project_dir' column found, will use auto-generated names")
+            
             for row_num, row in enumerate(reader, 1):
-                date_str = row['date']
-                site_name = row['site']
-                original_rgb = row['rgb']
-                original_multispec = row['multispec']
-                sunsens = row['sunsens']
+                # Debug: Print the first row to see what we're working with
+                if row_num == 1:
+                    logger.info(f"First row data: {dict(row)}")
+                
+                # More robust column access with error handling
+                try:
+                    date_str = row['date']
+                    site_name = row['site']
+                    original_rgb = row['rgb']
+                    original_multispec = row['multispec']
+                    sunsens = row['sunsens']
+                    
+                    # Check for custom project directory in extra mode
+                    custom_project_dir = None
+                    if self.extra_mode and has_custom_project_dir:
+                        custom_project_dir = row.get('custom_project_dir', '').strip()
+                        if not custom_project_dir:
+                            custom_project_dir = None
+                            
+                except KeyError as e:
+                    logger.error(f"Missing required column: {e}")
+                    logger.error(f"Available columns: {list(row.keys())}")
+                    continue
                 
                 logger.info(f"Processing row {row_num}: {site_name} / {date_str}")
+                if self.extra_mode and custom_project_dir:
+                    logger.info(f"  Using custom project directory: {custom_project_dir}")
                 
                 # Resolve corrected paths
                 rgb_path = self.resolve_path(site_name, date_str, 'rgb')
                 multispec_path = self.resolve_path(site_name, date_str, 'multispec')
-                project_dir = self.resolve_path(site_name, date_str, 'project')
+                project_dir = self.resolve_path(site_name, date_str, 'project', custom_project_dir)
                 
                 # Determine project file path
                 if project_dir:
-                    project_file = project_dir / f"metashape_project_{project_dir.parent.name}_{date_str}.psx"
+                    # In extra mode, use site name for project file naming if no custom dir specified
+                    if self.extra_mode and not custom_project_dir:
+                        sanitized_site = site_name.replace(' ', '_').replace('-', '_').lower()
+                        project_file = project_dir / f"metashape_project_{sanitized_site}_{date_str}.psx"
+                    elif self.extra_mode and custom_project_dir:
+                        project_file = project_dir / f"metashape_project_{custom_project_dir}_{date_str}.psx"
+                    else:
+                        project_file = project_dir / f"metashape_project_{project_dir.parent.name}_{date_str}.psx"
                 else:
                     project_file = None
                     logger.error(f"Could not determine project path for {site_name} / {date_str}")
@@ -426,6 +481,10 @@ class RobustProjectCreator:
                     'project_path': str(project_file) if project_file else 'N/A',
                     'image_load_status': 'pending'
                 }
+                
+                # Add custom project directory to result if in extra mode
+                if self.extra_mode:
+                    result['custom_project_dir'] = custom_project_dir or ''
                 
                 # Determine processing status and execute
                 try:
@@ -471,8 +530,19 @@ class RobustProjectCreator:
         # Write results to output CSV
         with open(output_csv, 'w', newline='', encoding='utf-8') as outfile:
             fieldnames = ['date', 'site', 'rgb', 'multispec', 'sunsens', 'project_path', 'image_load_status']
+            # Add custom_project_dir column for extra mode
+            if self.extra_mode:
+                fieldnames.insert(-1, 'custom_project_dir')  # Insert before image_load_status
+            
             writer = csv.DictWriter(outfile, fieldnames=fieldnames)
             writer.writeheader()
+            
+            # Add custom_project_dir to results if in extra mode
+            if self.extra_mode:
+                for result in results:
+                    if 'custom_project_dir' not in result:
+                        result['custom_project_dir'] = ''  # Default empty value
+            
             writer.writerows(results)
         
         logger.info(f"Results written to: {output_csv}")
@@ -494,23 +564,37 @@ def main():
     parser.add_argument('--output', help='Output CSV file (optional)')
     parser.add_argument('--dry-run', action='store_true', 
                        help='Only validate paths without creating projects')
+    parser.add_argument('--extra-mode', action='store_true',
+                       help='Enable extra mode for new site names and custom project directories')
+    parser.add_argument('--rgb-path', type=str,
+                       help='Custom RGB base path (overrides default)')
+    parser.add_argument('--multispec-path', type=str,
+                       help='Custom Multispec base path (overrides default)')
+    parser.add_argument('--project-path', type=str,
+                       help='Custom project base path (overrides default)')
     args = parser.parse_args()
     
-    # Define base paths
-    base_rgb_path = Path(r"M:/working_package_2/2024_dronecampaign/01_data/P1")
-    base_multispec_path = Path(r"M:/working_package_2/2024_dronecampaign/01_data/Micasense") 
-    project_base_path = Path(r"M:/working_package_2/2024_dronecampaign/02_processing/metashape_projects/Upscale_Metashapeprojects")
+    # Define base paths (use custom paths if provided)
+    base_rgb_path = Path(args.rgb_path) if args.rgb_path else Path(r"M:/working_package_2/2024_dronecampaign/01_data/P1")
+    base_multispec_path = Path(args.multispec_path) if args.multispec_path else Path(r"M:/working_package_2/2024_dronecampaign/01_data/Micasense")
+    project_base_path = Path(args.project_path) if args.project_path else Path(r"M:/working_package_2/2024_dronecampaign/02_processing/metashape_projects/Upscale_Metashapeprojects")
+    
+    # Log the paths being used
+    logger.info(f"Using RGB path: {base_rgb_path}")
+    logger.info(f"Using Multispec path: {base_multispec_path}")
+    logger.info(f"Using Project path: {project_base_path}")
     
     # Generate output filename if not provided
     if args.output:
         output_csv = args.output
     else:
         input_path = Path(args.input_csv)
-        suffix = "_validated" if args.dry_run else "_processed"
-        output_csv = str(input_path.parent / (input_path.stem + suffix + ".csv"))
+        mode_suffix = "_extra" if args.extra_mode else ""
+        status_suffix = "_validated" if args.dry_run else "_processed"
+        output_csv = str(input_path.parent / (input_path.stem + mode_suffix + status_suffix + ".csv"))
     
     # Create project creator and process
-    creator = RobustProjectCreator(base_rgb_path, base_multispec_path, project_base_path)
+    creator = RobustProjectCreator(base_rgb_path, base_multispec_path, project_base_path, extra_mode=args.extra_mode)
     creator.process_projects(args.input_csv, output_csv, dry_run=args.dry_run)
 
 

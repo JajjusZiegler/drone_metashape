@@ -1,0 +1,5 @@
+date,site,rgb,multispec,sunsens,custom_project_dir
+2024-07-15,New Research Forest,M:/working_package_2/2024_dronecampaign/01_data/P1/new_forest/2024-07-15,M:/working_package_2/2024_dronecampaign/01_data/Micasense/new_forest/2024-07-15,true,Forest_Research_2024
+2024-07-16,Coastal Monitoring Site,M:/working_package_2/2024_dronecampaign/01_data/P1/coastal/2024-07-16,M:/working_package_2/2024_dronecampaign/01_data/Micasense/coastal/2024-07-16,false,Marine_Ecosystem_Study
+2024-07-17,Urban Canopy Analysis,M:/working_package_2/2024_dronecampaign/01_data/P1/urban/2024-07-17,M:/working_package_2/2024_dronecampaign/01_data/Micasense/urban/2024-07-17,true,
+2024-07-18,wangen_zh,M:/working_package_2/2024_dronecampaign/01_data/P1/wangen_zh/2024-07-18,M:/working_package_2/2024_dronecampaign/01_data/Micasense/wangen_zh/2024-07-18,false,
