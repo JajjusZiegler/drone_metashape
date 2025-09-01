@@ -27,3 +27,5 @@ traveled_km.csv
 .gitignore
 __pycache__/upd_micasense_pos_filename.cpython-39.pyc
 test_path_correction.py
+drone_file_check_20250901_132439.csv
+drone_file_check_20250901_132549.csv
