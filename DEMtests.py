@@ -638,7 +638,10 @@ def proc_rgb():
         with open(analyze_done_rgb, 'w') as done_file:
             done_file.write("analyzeImages step completed.\n")
 
-    low_img_qual = [camera for camera in chunk.cameras if (float(camera.meta["Image/Quality"]) < IMG_QUAL_THRESHOLD)]
+    low_img_qual = [camera for camera in chunk.cameras 
+                    if "Image/Quality" in camera.meta and 
+                    camera.meta["Image/Quality"] is not None and
+                    float(camera.meta["Image/Quality"]) < IMG_QUAL_THRESHOLD]
     if low_img_qual:
         print("Removing cameras with Image Quality < %.1f" % IMG_QUAL_THRESHOLD)
         logging.info("Removing cameras with Image Quality < %.1f" % IMG_QUAL_THRESHOLD)
@@ -909,6 +912,11 @@ def proc_multispec(rgb_dem_files):
             del_camera_names.append(camera.label)
 
     # Delete images outside of P1 capture times
+    # Identify cameras to delete (outside P1 capture times)
+    total_cameras = len([camera for camera in chunk.cameras if camera.label == camera.master.label])
+    num_to_delete = len(del_camera_names)
+    print(f"Deleting {num_to_delete} out of {total_cameras} MicaSense master images (outside P1 capture times).")
+    logging.info(f"Deleting {num_to_delete} out of {total_cameras} MicaSense master images (outside P1 capture times).")
     logging.info("Deleting MicaSense images that triggered outside P1 capture times")
     for camera in chunk.cameras:
         # Only calibration images are in a group. The following line is necessary to avoid NoneType error on other images
@@ -954,7 +962,10 @@ def proc_multispec(rgb_dem_files):
             done_file.write("analyzeImages step completed.\n")
 
     low_img_qual = []
-    low_img_qual = [camera.master for camera in chunk.cameras if (float(camera.meta["Image/Quality"]) < 0.5)]
+    low_img_qual = [camera.master for camera in chunk.cameras 
+                    if "Image/Quality" in camera.meta and 
+                    camera.meta["Image/Quality"] is not None and
+                    float(camera.meta["Image/Quality"]) < 0.5]
     if low_img_qual:
         print("Removing cameras with Image Quality < %.1f" % 0.5)
         logging.info("Removing cameras with Image Quality < %.1f" % 0.5)
