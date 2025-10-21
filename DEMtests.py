@@ -1203,7 +1203,19 @@ if doc is None:
     sys.exit()
 
 if args.rgb:
-    MRK_PATH = args.rgb
+    # Check if the provided path already contains level0_raw or if we need to add it
+    rgb_path = Path(args.rgb)
+    if rgb_path.name == "level0_raw" or (rgb_path / "level0_raw").exists():
+        if rgb_path.name == "level0_raw":
+            MRK_PATH = str(rgb_path)
+        else:
+            MRK_PATH = str(rgb_path / "level0_raw")
+    else:
+        # Use the provided path as-is (assuming it contains the raw images directly)
+        MRK_PATH = str(rgb_path)
+    
+    if not Path(MRK_PATH).is_dir():
+        sys.exit("%s directory does not exist. Check and input paths using -rgb " % str(MRK_PATH))
 else:
     # Default is relative to project location: ../rgb/level0_raw/
     MRK_PATH = Path(proj_file).parents[1] / "rgb/level0_raw"
@@ -1214,7 +1226,19 @@ else:
 
 # TODO update when other sensors are used
 if args.multispec:
-    MICASENSE_PATH = args.multispec
+    # Check if the provided path already contains level0_raw or if we need to add it
+    multispec_path = Path(args.multispec)
+    if multispec_path.name == "level0_raw" or (multispec_path / "level0_raw").exists():
+        if multispec_path.name == "level0_raw":
+            MICASENSE_PATH = str(multispec_path)
+        else:
+            MICASENSE_PATH = str(multispec_path / "level0_raw")
+    else:
+        # Use the provided path as-is (assuming it contains the raw images directly)
+        MICASENSE_PATH = str(multispec_path)
+    
+    if not Path(MICASENSE_PATH).is_dir():
+        sys.exit("%s directory does not exist. Check and input paths using -multispec " % str(MICASENSE_PATH))
 else:
     # Default is relative to project location: ../multispec/level0_raw/
     MICASENSE_PATH = Path(proj_file).parents[1] / "multispec/level0_raw"

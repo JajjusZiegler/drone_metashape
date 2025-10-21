@@ -36,6 +36,8 @@ from pathlib import Path
 from collections import defaultdict
 from typing import List, Tuple, Optional
 import logging
+from datetime import datetime
+import Metashape
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -630,13 +632,18 @@ def main():
     if args.output:
         output_csv = args.output
     else:
+        # Create timestamped filename in the project lists folder
         input_path = Path(args.input_csv)
         mode_suffix = "_extra" if args.extra_mode else ""
         status_suffix = "_validated" if args.dry_run else "_project_created"
-        if args.project_path:
-            output_csv = str(Path(args.project_path) / (input_path.stem + mode_suffix + status_suffix + ".csv"))
-        else:
-            output_csv = str(project_base_path / (input_path.stem + mode_suffix + status_suffix + ".csv"))
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Define the output folder for project lists
+        output_folder = project_base_path / "0001_project_lists"
+        output_folder.mkdir(parents=True, exist_ok=True)
+        
+        filename = f"{input_path.stem}{mode_suffix}{status_suffix}_{timestamp}.csv"
+        output_csv = str(output_folder / filename)
 
     logger.info(f"Input CSV: {args.input_csv}")
     logger.info(f"Output CSV: {output_csv}")

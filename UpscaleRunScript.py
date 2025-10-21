@@ -9,10 +9,71 @@ import datetime
 import threading
 import time
 
-# Configuration (same as before)
-csv_file_path = input("Enter the path to the CSV file: ")
+# Configuration - CSV file input with smart defaults
+def get_csv_file_path():
+    """Get CSV file path with smart defaults for unprocessed projects"""
+    
+    # Default directory for UPSCALE projects
+    default_dir = Path(r"M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects")
+    
+    # Look for recent unprocessed projects CSV files
+    recent_unprocessed = []
+    if default_dir.exists():
+        pattern = "unprocessed_projects_*.csv"
+        recent_unprocessed = sorted(default_dir.glob(pattern), key=lambda x: x.stat().st_mtime, reverse=True)
+    
+    print("🚁 UPSCALE Batch Processing")
+    print("=" * 40)
+    
+    if recent_unprocessed:
+        print(f"📋 Found recent unprocessed projects files:")
+        for i, file_path in enumerate(recent_unprocessed[:5], 1):  # Show top 5
+            mod_time = datetime.datetime.fromtimestamp(file_path.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
+            print(f"  {i}. {file_path.name} ({mod_time})")
+        
+        print(f"\n💡 Press Enter to use most recent: {recent_unprocessed[0].name}")
+        print("   Or enter full path to different CSV file:")
+        
+        csv_input = input("> ").strip().strip('"').strip("'")
+        
+        if not csv_input:  # Use most recent if empty
+            return str(recent_unprocessed[0])
+        elif csv_input.isdigit() and 1 <= int(csv_input) <= len(recent_unprocessed):
+            return str(recent_unprocessed[int(csv_input) - 1])
+        else:
+            return csv_input
+    else:
+        print("📂 Enter the path to the CSV file:")
+        return input("> ").strip().strip('"').strip("'")
+
+csv_file_path = get_csv_file_path()
+
+# Validate CSV file path
+if not os.path.exists(csv_file_path):
+    print(f"❌ Error: CSV file not found: {csv_file_path}")
+    print("Please check the path and try again.")
+    sys.exit(1)
+    
+print(f"✅ Using CSV file: {csv_file_path}")
+
 target_script_path = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\DEMtests.py"
+metashape_python_path = r"C:\Program Files\Agisoft\Metashape Pro\python\python.exe"
 HARDCODED_CRS = "2056"
+
+# Validate Metashape Python interpreter
+if not os.path.exists(metashape_python_path):
+    print(f"❌ Error: Metashape Python interpreter not found at: {metashape_python_path}")
+    print("Please check your Metashape installation or update the path in the script.")
+    sys.exit(1)
+
+print(f"✅ Using Metashape Python: {metashape_python_path}")
+
+# Validate target script
+if not os.path.exists(target_script_path):
+    print(f"❌ Error: Target script not found: {target_script_path}")
+    sys.exit(1)
+
+print(f"✅ Target script found: {target_script_path}")
 TEST_FLAG_ENABLED = False
 
 # Timeout duration in seconds (50 minutes)
@@ -132,6 +193,30 @@ with open(csv_file_path, mode='r', newline='', encoding='utf-8') as csv_file:
     rows = list(csv_reader)
     fieldnames = csv_reader.fieldnames + ['ortho_rgb', 'ortho_ms', 'report_rgb', 'report_ms', 'status']
 
+print(f"\n📊 BATCH PROCESSING SUMMARY")
+print(f"{'='*50}")
+print(f"Projects to process: {len(rows)}")
+print(f"Target script: {target_script_path}")
+print(f"Python interpreter: {metashape_python_path}")
+print(f"CRS: {HARDCODED_CRS}")
+print(f"Test mode: {'Enabled' if TEST_FLAG_ENABLED else 'Disabled'}")
+print(f"Timeout: {TIMEOUT_DURATION//60} minutes")
+
+if len(rows) > 0:
+    print(f"\nFirst few projects:")
+    for i, row in enumerate(rows[:3], 1):
+        print(f"  {i}. {row.get('site', 'Unknown')} - {row.get('date', 'Unknown')}")
+    if len(rows) > 3:
+        print(f"  ... and {len(rows)-3} more")
+
+print(f"\n⚠️  This will start processing {len(rows)} projects.")
+confirm = input("Continue? (y/N): ").strip().lower()
+if confirm not in ['y', 'yes']:
+    print("❌ Processing cancelled.")
+    sys.exit(0)
+
+print(f"\n🚀 Starting batch processing...")
+
 # Main processing loop (modified to include timeout logic)
 for row in rows:
     project_path = row.get('project_path', '').strip()
@@ -143,6 +228,18 @@ for row in rows:
         continue
 
     project_logger = setup_project_logger(project_path, site, date)
+    
+    # Debug: Log available columns and values
+    project_logger.info(f"CSV columns available: {list(row.keys())}")
+    project_logger.info(f"Processing project: {site} - {date}")
+    project_logger.info(f"Project path: {project_path}")
+    project_logger.info(f"RGB data path: {row.get('rgb_data_path', 'N/A')} (fallback: {row.get('rgb', 'N/A')})")
+    project_logger.info(f"Multispec data path: {row.get('multispec_data_path', 'N/A')} (fallback: {row.get('multispec', 'N/A')})")
+    
+    # Validate project file exists
+    if not os.path.exists(project_path):
+        project_logger.error(f"Project file does not exist: {project_path}")
+        continue
 
     if check_output_files_exist(project_path, project_logger):
         project_logger.info(f"Skipping already processed project: {project_path}")
@@ -153,9 +250,40 @@ for row in rows:
         project_logger.warning(f"Skipping row due to missing arguments: {missing_args}")
         continue
 
-    cmd = [sys.executable, target_script_path, "-proj_path", row['project_path'], "-date", row['date'], "-site", row['site'], "-crs", HARDCODED_CRS, "-smooth", "medium"]
-    if row.get('multispec'): cmd.extend(["-multispec", row['multispec']])
-    if row.get('rgb'): cmd.extend(["-rgb", row['rgb']])
+    # Use Metashape Python interpreter directly
+    cmd = [metashape_python_path, target_script_path, "-proj_path", row['project_path'], "-date", row['date'], "-site", row['site'], "-crs", HARDCODED_CRS, "-smooth", "medium"]
+    
+    # Add RGB and multispec paths if available
+    if row.get('rgb_data_path'):  # Updated to match the column name from status checker
+        rgb_path = row['rgb_data_path']
+        if os.path.exists(rgb_path):
+            cmd.extend(["-rgb", rgb_path])
+            project_logger.info(f"Using RGB path: {rgb_path}")
+        else:
+            project_logger.warning(f"RGB path does not exist: {rgb_path}")
+    elif row.get('rgb'):  # Fallback to original column name
+        rgb_path = row['rgb']
+        if os.path.exists(rgb_path):
+            cmd.extend(["-rgb", rgb_path])
+            project_logger.info(f"Using RGB path (fallback): {rgb_path}")
+        else:
+            project_logger.warning(f"RGB path (fallback) does not exist: {rgb_path}")
+    
+    if row.get('multispec_data_path'):  # Updated to match the column name from status checker
+        multispec_path = row['multispec_data_path']
+        if os.path.exists(multispec_path):
+            cmd.extend(["-multispec", multispec_path])
+            project_logger.info(f"Using multispec path: {multispec_path}")
+        else:
+            project_logger.warning(f"Multispec path does not exist: {multispec_path}")
+    elif row.get('multispec'):  # Fallback to original column name
+        multispec_path = row['multispec']
+        if os.path.exists(multispec_path):
+            cmd.extend(["-multispec", multispec_path])
+            project_logger.info(f"Using multispec path (fallback): {multispec_path}")
+        else:
+            project_logger.warning(f"Multispec path (fallback) does not exist: {multispec_path}")
+    
     if row.get('sunsens', '').lower() == 'true': cmd.append("-sunsens")
     if TEST_FLAG_ENABLED: cmd.append("-test")
 
