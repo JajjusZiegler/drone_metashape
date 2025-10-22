@@ -751,34 +751,43 @@ def proc_rgb():
                                  face_count=Metashape.MediumFaceCount)
             #doc.save()
 
-            # Check if the ortho file already exists
-            ortho_file = export_dir / f"{file_prefix}_rgb_model_ortho_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.tif"
-            if ortho_file.exists():
-                print(f"Orthomosaic file already exists: {ortho_file}. Skipping this step.")
-                logging.info(f"Orthomosaic file already exists: {ortho_file}. Skipping this step.")
-            else:
-                # Decimate and smooth mesh to use as orthorectification surface
-                # Halve face count?
+        # Check if the ortho file already exists - this should run regardless of model existence
+        ortho_file = export_dir / f"{file_prefix}_rgb_model_ortho_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.tif"
+        if ortho_file.exists():
+            print(f"Orthomosaic file already exists: {ortho_file}. Skipping this step.")
+            logging.info(f"Orthomosaic file already exists: {ortho_file}. Skipping this step.")
+        else:
+            # Decimate and smooth mesh to use as orthorectification surface
+            # Halve face count?
+            
+            if chunk.model:
+                # Select the original model (index 0) before decimating
+                if len(chunk.models) > 1:
+                    chunk.model = chunk.models[0]
+                    logging.info(f"Selected original model (index 0) for decimation: {chunk.model}")
+            
+            model_file = export_dir / f"{file_prefix}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
+            if not model_file.exists():
                 chunk.decimateModel(face_count=len(chunk.model.faces) / 2)
                 # Smooth model
                 smooth_val = DICT_SMOOTH_STRENGTH[args.smooth]
                 chunk.smoothModel(smooth_val)
                 # Export model for use in micasense chunk
-                model_file = export_dir / f"{file_prefix}_rgb_smooth_{DICT_SMOOTH_STRENGTH[args.smooth]}.obj"
-
-                logging.info(f"Exporting smoothed model to build Orthomosaic in Multispectral chunk: {model_file}")
-
                 chunk.exportModel(path=str(model_file), crs=target_crs, format=Metashape.ModelFormatOBJ)
-                # Build Orthomosaic from Model data
-                chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
+                logging.info(f"Exported smoothed model: {model_file}")
+            
+            # Build orthomosaic using smoothed model
+            print("Build orthomosaic using smoothed model")
+            
+            chunk.buildOrthomosaic(surface_data=Metashape.DataSource.ModelData, refine_seamlines=True)
 
-                chunk.exportRaster(path=str(ortho_file), resolution=float(ortho_res),
-                                   image_format=Metashape.ImageFormatTIFF,
-                                   save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
-                print("Exported orthomosaic " + str(ortho_file))
+            chunk.exportRaster(path=str(ortho_file), resolution=float(ortho_res),
+                               image_format=Metashape.ImageFormatTIFF,
+                               save_alpha=False, source_data=Metashape.OrthomosaicData, image_compression=compression)
+            print("Exported orthomosaic " + str(ortho_file))
 
-                logging.info(f"Exported RGB orthomosaic: {ortho_file}")
-                print(f"OUTPUT_ORTHO_RGB: {ortho_file}")
+            logging.info(f"Exported RGB orthomosaic: {ortho_file}")
+            print(f"OUTPUT_ORTHO_RGB: {ortho_file}")
 
     #
     # Build DEM
