@@ -66,3 +66,8 @@
 2025-05-07 10:19:02,442 - INFO - Successfully read sheet 1 from C:\Users\admin\Downloads\UPSCALE_drone_logbook(2).xlsx
 2025-05-07 10:19:02,442 - ERROR - Missing required columns: {'date', 'crs', 'sunsens', 'rgb', 'site', 'multispec'}
 2025-05-07 10:19:02,442 - ERROR - Script failed: Missing required columns in Excel sheet: {'date', 'crs', 'sunsens', 'rgb', 'site', 'multispec'}
+2025-10-28 13:29:24,386 - ERROR - File not found: "C:\Users\admin\Downloads\UPSCALE_drone_logbook20251028.xlsx"
+2025-10-28 13:29:24,387 - ERROR - Script failed: Excel file not found: "C:\Users\admin\Downloads\UPSCALE_drone_logbook20251028.xlsx"
+2025-10-28 13:30:08,912 - INFO - Successfully read sheet 1 from C:\Users\admin\Downloads\UPSCALE_drone_logbook20251028.xlsx
+2025-10-28 13:30:08,912 - ERROR - Missing required columns: {'site', 'date', 'sunsens', 'crs', 'multispec', 'rgb'}
+2025-10-28 13:30:08,913 - ERROR - Script failed: Missing required columns in Excel sheet: {'site', 'date', 'sunsens', 'crs', 'multispec', 'rgb'}
