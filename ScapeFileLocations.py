@@ -177,7 +177,15 @@ def scrape_metashape_files(base_dir, output_csv):
 
             "project_name_variants": ["WangenBrüttisellen_treenet", "WangenBrüttisellenTreenet", "wangen_zh", "Wangen_Brüttisellen_treenet"] # Added more variants        }
         # Add more manual project name variations here, *without* overriding image_site_name unless absolutely necessary.
-    }
+        },
+        "Funes": {
+            "image_site_name": "Funes",
+            "project_name_variants": ["Funes", "funes_project", "Funes_Area"]
+        },
+        "Nigras": {
+            "image_site_name": "Nigras",
+            "project_name_variants": ["Nigras", "Nigras_Project"]
+        }
     }
 
     # --- Merge dynamic rules with manual overrides ---

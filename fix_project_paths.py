@@ -58,6 +58,9 @@ class RobustPathResolver:
         """
         mappings = {
             # Site name variations to standardized names
+            # Format: CSV site name -> {rgb: folder_name, multispec: folder_name, project: folder_name}
+            
+            # Wangen Brüttisellen / wangen_zh
             "Wangen Brüttisellen": {
                 "rgb": "wangen_zh",
                 "multispec": "wangen_zh", 
@@ -68,6 +71,8 @@ class RobustPathResolver:
                 "multispec": "wangen_zh",
                 "project": "WangenBrüttisellen_treenet"
             },
+            
+            # Sanasilva sites
             "Sanasilva-50845": {
                 "rgb": "sanasilva_50845",
                 "multispec": "sanasilva_50845",
@@ -88,6 +93,8 @@ class RobustPathResolver:
                 "multispec": "sanasilva_50877", 
                 "project": "Schüpfen_sanasilva50877"
             },
+            
+            # Marteloskop (note: project folder has capital M)
             "Martelloskop": {
                 "rgb": "marteloskop",
                 "multispec": "marteloskop",
@@ -98,6 +105,13 @@ class RobustPathResolver:
                 "multispec": "marteloskop",
                 "project": "Marteloskop"
             },
+            "Marteloskop": {
+                "rgb": "marteloskop",
+                "multispec": "marteloskop",
+                "project": "Marteloskop"
+            },
+            
+            # LWF sites
             "LWF-Davos": {
                 "rgb": "lwf_davos",
                 "multispec": "lwf_davos",
@@ -107,27 +121,6 @@ class RobustPathResolver:
                 "rgb": "lwf_davos",
                 "multispec": "lwf_davos",
                 "project": "Davos_LWF"
-            },
-            "Stillberg": {
-                "rgb": "Stillberg",
-                "multispec": "stillberg",  # Note: lowercase in Micasense
-                "project": "Stillberg"
-            },
-            "stillberg": {
-                "rgb": "Stillberg", 
-                "multispec": "stillberg",
-                "project": "Stillberg"
-            },
-            # Add more mappings as needed
-            "Pfynwald": {
-                "rgb": "Pfynwald",
-                "multispec": "Pfynwald",
-                "project": "Pfynwald"
-            },
-            "Illgraben": {
-                "rgb": "Illgraben", 
-                "multispec": "Illgraben",
-                "project": "Illgraben"
             },
             "lwf_isone": {
                 "rgb": "lwf_isone",
@@ -154,11 +147,37 @@ class RobustPathResolver:
                 "multispec": "lwf_visp",
                 "project": "Visp_LWF"
             },
+            
+            # Stillberg (IMPORTANT: RGB=Stillberg, Multispec=stillberg)
+            "Stillberg": {
+                "rgb": "Stillberg",
+                "multispec": "stillberg",  # Note: lowercase in Micasense
+                "project": "Stillberg"
+            },
+            "stillberg": {
+                "rgb": "Stillberg", 
+                "multispec": "stillberg",
+                "project": "Stillberg"
+            },
+            
+            # Other sites
+            "Pfynwald": {
+                "rgb": "Pfynwald",
+                "multispec": "Pfynwald",
+                "project": "Pfynwald"
+            },
+            "Illgraben": {
+                "rgb": "Illgraben", 
+                "multispec": "Illgraben",
+                "project": "Illgraben"
+            },
             "sagno": {
                 "rgb": "sagno",
                 "multispec": "sagno",
                 "project": "Sagno_treenet"
             },
+            
+            # TreeNet sites
             "treenet_salgesch": {
                 "rgb": "treenet_salgesch",
                 "multispec": "treenet_salgesch",
