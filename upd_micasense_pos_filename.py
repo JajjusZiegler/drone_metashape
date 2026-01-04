@@ -256,6 +256,14 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
 
     """
     print("Loading micasense images")
+
+    # Reset global state per call (module is imported and reused across runs)
+    global P1_events, P1_pos_mrk, P1_pos, P1_first_timestamp, P1_last_timestamp
+    P1_events = []
+    P1_pos_mrk = []
+    P1_pos = []
+    P1_first_timestamp = {}
+    P1_last_timestamp = {}
     
     mica_events = []
     mica_pos = []
@@ -359,12 +367,62 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
     
         
     # List of MRK file(s)
-    mrk_file_count = 0
-    mrk_file_list = []
-    for filename in glob.iglob(mrk_folder + '/' + '**/*.MRK', recursive=True):
-        mrk_file_list.append(filename)
-        mrk_file_count = mrk_file_count + 1
-    
+    # NOTE: mrk_folder may contain multiple subfolders (e.g., multiple flights / missions).
+    # We must NOT mix unrelated MRKs, otherwise the P1 time window and between-flight filtering becomes unreliable.
+    discovered_mrks = list(glob.iglob(str(mrk_folder) + '/' + '**/*.MRK', recursive=True))
+    if not discovered_mrks:
+        raise FileNotFoundError(f"No .MRK files found under: {mrk_folder}")
+
+    # Determine MicaSense capture time range (epoch seconds)
+    mica_epoch_secs = [dt.timestamp() for dt in mica_events]
+    mica_min = min(mica_epoch_secs) if mica_epoch_secs else None
+    mica_max = max(mica_epoch_secs) if mica_epoch_secs else None
+
+    # Select MRK files that overlap the MicaSense time range.
+    # This avoids pulling in MRKs from other missions/days if the folder contains multiple exports.
+    mrk_windows = []  # (first_ts, last_ts, mrk_path)
+    for mrk_path in discovered_mrks:
+        try:
+            with open(mrk_path, 'r') as f:
+                lines = f.readlines()
+            if not lines:
+                continue
+            first_ts = get_P1_timestamp(lines[0])
+            last_ts = get_P1_timestamp(lines[-1])
+            mrk_windows.append((first_ts, last_ts, mrk_path))
+        except Exception as e:
+            logging.warning(f"Failed to read MRK file '{mrk_path}': {e}")
+
+    if not mrk_windows:
+        raise FileNotFoundError(f"Found MRK paths but could not read any: {mrk_folder}")
+
+    selected = []
+    if mica_min is not None and mica_max is not None:
+        for first_ts, last_ts, mrk_path in mrk_windows:
+            # Overlap check
+            if not (last_ts < mica_min or first_ts > mica_max):
+                selected.append((first_ts, last_ts, mrk_path))
+
+    if selected:
+        # Sort MRKs chronologically by first timestamp (critical for P1_first/last indexing logic)
+        selected.sort(key=lambda t: t[0])
+        mrk_file_list = [t[2] for t in selected]
+        if len(mrk_windows) > len(selected):
+            logging.warning(
+                "Multiple MRK files found under '%s' (%d). Using %d that overlap MicaSense time range.",
+                str(mrk_folder), len(mrk_windows), len(selected)
+            )
+    else:
+        # Fallback: use all MRKs, but in deterministic chronological order
+        mrk_windows.sort(key=lambda t: t[0])
+        mrk_file_list = [t[2] for t in mrk_windows]
+        logging.warning(
+            "No MRK files overlapped the MicaSense time range. Falling back to all MRKs under '%s' (%d).",
+            str(mrk_folder), len(mrk_windows)
+        )
+
+    mrk_file_count = len(mrk_file_list)
+
     loop_count = 1
     for mrk_file in mrk_file_list:
         # Get first and last P1 timestamp. Update global vars with timestamp and position of all P1 images.
@@ -401,10 +459,24 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
                 P1_pos.append([new_easting, new_northing, new_altitude])
             except (KeyError, ValueError, TypeError) as e:
                 print(f"Error processing API response for coordinates {pos}: {e}")
-                P1_pos.append([None, None, None])
+                # Fallback to transformer if API fails
+                try:
+                    E, N = transformer.transform(lat, lon)
+                    P1_pos.append([E, N, alt])
+                    print(f"Used fallback transformer for position: {lat}, {lon}, {alt}")
+                except Exception as fallback_error:
+                    print(f"Fallback transformation also failed: {fallback_error}")
+                    P1_pos.append([None, None, None])
         else:
-            print(f"Transformation failed for coordinates: {pos}")
-            P1_pos.append([None, None, None])
+            print(f"API transformation failed for coordinates: {pos}, using fallback transformer")
+            # Fallback to transformer if API fails
+            try:
+                E, N = transformer.transform(lat, lon)
+                P1_pos.append([E, N, alt])
+                print(f"Used fallback transformer for position: {lat}, {lon}, {alt}")
+            except Exception as fallback_error:
+                print(f"Fallback transformation also failed: {fallback_error}")
+                P1_pos.append([None, None, None])
  
         
     # Create output MicaSense position csv 
@@ -458,6 +530,22 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
                 upd_pos1 = P1_pos[a-1]
                 upd_pos2 = P1_pos[a]
     
+            # Check if bracketing positions are valid (not None)
+            if (upd_pos1[0] is None or upd_pos1[1] is None or upd_pos1[2] is None or
+                upd_pos2[0] is None or upd_pos2[1] is None or upd_pos2[2] is None):
+                print(f"Warning: Invalid bracketing positions for MicaSense image {count}. Skipping interpolation.")
+                logging.warning(f"Invalid bracketing positions for MicaSense image {count}. Camera will use original GPS position.")
+                # Use the original MicaSense position from GPS
+                pos_index = mica_events.index(m_cam_time)
+                path_image_name = os.path.abspath(filelist[count])
+                image_name = path_image_name
+                rec = ("%s, %10.6f, %10.6f, %10.4f\n" % \
+                        (image_name, mica_pos[pos_index][0], mica_pos[pos_index][1], mica_pos[pos_index][2]))
+                print("Writing to file (original GPS): ", rec)
+                out_frame.write(rec)
+                count = count + 1
+                continue
+    
             # Compute time_delta only if time2 and time1 are different
         time_delta = 0.0
 
@@ -504,3 +592,13 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
         
     # Close the CSV file
     out_frame.close()
+    
+    # Print summary statistics
+    cameras_outside_p1 = len([pos for pos in mica_pos if pos[2] == 0])
+    cameras_interpolated = count - cameras_outside_p1
+    print(f"\n=== MicaSense Position Interpolation Summary ===")
+    print(f"Total MicaSense images processed: {count}")
+    print(f"Images interpolated from P1 positions: {cameras_interpolated}")
+    print(f"Images outside P1 capture times (will be deleted): {cameras_outside_p1}")
+    logging.info(f"MicaSense interpolation complete: {cameras_interpolated} interpolated, {cameras_outside_p1} outside P1 times")
+    print(f"Output written to: {out_file}")

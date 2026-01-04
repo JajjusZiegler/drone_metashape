@@ -924,8 +924,21 @@ def proc_multispec(rgb_dem_files):
     # Identify cameras to delete (outside P1 capture times)
     total_cameras = len([camera for camera in chunk.cameras if camera.label == camera.master.label])
     num_to_delete = len(del_camera_names)
+    
+    # Safety check: don't delete if more than 50% of cameras would be removed
+    deletion_percentage = (num_to_delete / total_cameras * 100) if total_cameras > 0 else 0
+    
     print(f"Deleting {num_to_delete} out of {total_cameras} MicaSense master images (outside P1 capture times).")
+    print(f"Deletion percentage: {deletion_percentage:.1f}%")
     logging.info(f"Deleting {num_to_delete} out of {total_cameras} MicaSense master images (outside P1 capture times).")
+    logging.info(f"Deletion percentage: {deletion_percentage:.1f}%")
+    
+    if deletion_percentage > 50:
+        warning_msg = f"WARNING: Attempting to delete {deletion_percentage:.1f}% of cameras! This may indicate an interpolation problem."
+        print(warning_msg)
+        logging.warning(warning_msg)
+        print("Cameras marked for deletion will still be removed, but please verify the interpolation results.")
+    
     logging.info("Deleting MicaSense images that triggered outside P1 capture times")
     for camera in chunk.cameras:
         # Only calibration images are in a group. The following line is necessary to avoid NoneType error on other images
