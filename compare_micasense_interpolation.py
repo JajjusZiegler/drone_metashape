@@ -8,6 +8,7 @@ from typing import Optional, Tuple
 import numpy as np
 
 from upd_micasense_pos_filename import ret_micasense_pos
+from upd_micasense_pos_from_chunk import run_interpolation_from_chunk
 
 
 def find_master_band_images(root: Path, suffix: str = "_6.tif") -> list[str]:
@@ -236,16 +237,34 @@ def main():
         raise FileNotFoundError(f"No master band images (*_6.tif) found under: {mica_root}")
 
     print(f"Found {len(master_band_images)} MicaSense master band images")
-    print("Running fixed interpolation...")
+    print("Running fixed interpolation (using aligned RGB chunk)...")
 
-    ret_micasense_pos(
-        master_band_images,
-        str(rgb_root),
-        str(mica_root),
-        "6",
-        "2056",
-        str(new_csv),
-        np.array([0.0, 0.0, 0.0]),
+    # Use the new chunk-based interpolation
+    # We need the project path. In the args.project_psx case, we have it.
+    # In the fallback case, we need to construct it or fail if not present.
+    
+    project_path_for_interp = None
+    if args.project_psx:
+        project_path_for_interp = args.project_psx
+    else:
+        # Construct from hardcoded default if possible, or raise error. 
+        # The hardcoded default was: ...\Upscale_Metashapeprojects\Pfynwald\20251104\metashape_project_pfynwald_20251104.psx (guessing name)
+        # Let's try to find it in the folder if not provided
+        # Or simpler: require --project-psx for the new method since it relies on the doc.
+        
+        # Try to find psx in the parent of project_ref_dir
+        candidate_psx = list(project_ref_dir.parent.glob("*.psx"))
+        if candidate_psx:
+            project_path_for_interp = candidate_psx[0]
+        else:
+             print("Error: No .psx project found for chunk-based interpolation. Please provide --project-psx.")
+             return
+
+    run_interpolation_from_chunk(
+        project_path_for_interp,
+        mica_root,
+        new_csv,
+        rgb_folder=rgb_root
     )
 
     print("Fixed interpolation written:", new_csv)

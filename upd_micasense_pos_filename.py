@@ -49,42 +49,51 @@ EPSG_4326 = 4326
 
 
 # API endpoint for the Swisstopo transformation
-API_URL = "https://geodesy.geo.admin.ch/reframe/wgs84tolv95"
+API_URL = "https://geodesy.geo.admin.ch/reframe/wgs84tolv03"
 
 ###############################################################################
 # Functions
 ###############################################################################
-# added twp new functions, that use swisstopo api to get CH190+ coordinates for P1 positions
+# added twp new functions, that use swisstopo api to get CH1903+ coordinates for P1 positions
 
 
-def transform_coordinates(lon, lat, alt=None):
+def transform_coordinates(lon, lat, alt=None, max_retries=3, delay=0.15):
     """
     Transform coordinates using the Swisstopo API.
     Parameters:
       lon (float): Longitude (or easting) in WGS84.
       lat (float): Latitude (or northing) in WGS84.
       alt (float, optional): Altitude value.
+      max_retries (int): Number of retry attempts on failure.
+      delay (float): Seconds to wait between API calls to avoid rate limiting.
     Returns:
       dict: A dictionary with keys 'easting', 'northing', and 'altitude' containing transformed values.
             Returns None if the transformation fails.
     """
+    import time
     # Build the request parameters.
     params = {"northing": lat, "easting": lon, "altitude": alt, "format": "json"}
-    try:
-        response = requests.get(API_URL, params=params)
-        response.raise_for_status()  # Raise an error if the request failed
-        result = response.json()
-        print("API response:", result)
+    for attempt in range(max_retries):
+        try:
+            if delay > 0:
+                time.sleep(delay)
+            response = requests.get(API_URL, params=params, timeout=10)
+            response.raise_for_status()
+            result = response.json()
 
-        # Ensure we get numeric values from the response
-        return {
-            "easting": float(result.get("easting", 0.0)),
-            "northing": float(result.get("northing", 0.0)),
-            "altitude": float(result.get("altitude", 0.0))
-        }
-    except Exception as e:
-        print(f"Error in transform_coordinates for lon: {lon}, lat: {lat}: {e}")
-        return None
+            # Ensure we get numeric values from the response
+            return {
+                "easting": float(result.get("easting", 0.0)),
+                "northing": float(result.get("northing", 0.0)),
+                "altitude": float(result.get("altitude", 0.0))
+            }
+        except Exception as e:
+            logging.warning(f"API attempt {attempt+1}/{max_retries} failed for lon={lon}, lat={lat}: {e}")
+            if attempt < max_retries - 1:
+                import time
+                time.sleep(1.0)  # longer back-off before retry
+    print(f"Error in transform_coordinates for lon: {lon}, lat: {lat}: all {max_retries} attempts failed")
+    return None
 
 def get_transformed_P1_positions(mrk_file):
     """
@@ -429,54 +438,35 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
         get_P1_position(mrk_file, loop_count)
         loop_count = loop_count + 1
         
-    # Replace the original transformation block:
-    # P1_pos_arr = np.array(P1_pos_mrk)
-    # P1_pos_shifted = P1_pos_arr + P1_shift_vec         
-    # E, N = transformer.transform(P1_pos_shifted[:,0], P1_pos_shifted[:,1])
-    # P1_pos = np.dstack((E, N, P1_pos_shifted[:,2]))[0]
-
-    # With the following code using the transform_coordinates API:
+    # Transform all P1 positions from WGS84 (lat/lon) to CH1903+/LV95 using Swisstopo API
     P1_pos_arr = np.array(P1_pos_mrk)
     P1_pos_shifted = P1_pos_arr + P1_shift_vec
 
-    P1_pos = []  # This list will hold the transformed positions
-
-    for pos in P1_pos_shifted:
-        # Remember: in P1_pos_mrk, positions are stored as [lat, lon, ellh]
+    P1_pos = []
+    total = len(P1_pos_shifted)
+    for i, pos in enumerate(P1_pos_shifted):
         lat = pos[0]
         lon = pos[1]
         alt = pos[2]
-        
-        # Call the API-based transformation function
+
         result = transform_coordinates(lon, lat, alt)
-        
+
         if result:
-            try:
-                new_easting = float(result["easting"])
-                new_northing = float(result["northing"])
-                # You can adjust how you use the altitude; here we use the returned value if provided.
-                new_altitude = float(result.get("altitude", 0.0) or 0.0)
-                P1_pos.append([new_easting, new_northing, new_altitude])
-            except (KeyError, ValueError, TypeError) as e:
-                print(f"Error processing API response for coordinates {pos}: {e}")
-                # Fallback to transformer if API fails
-                try:
-                    E, N = transformer.transform(lat, lon)
-                    P1_pos.append([E, N, alt])
-                    print(f"Used fallback transformer for position: {lat}, {lon}, {alt}")
-                except Exception as fallback_error:
-                    print(f"Fallback transformation also failed: {fallback_error}")
-                    P1_pos.append([None, None, None])
+            P1_pos.append([result["easting"], result["northing"], result["altitude"]])
         else:
-            print(f"API transformation failed for coordinates: {pos}, using fallback transformer")
-            # Fallback to transformer if API fails
+            # Fallback to pyproj transformer if API fails
             try:
                 E, N = transformer.transform(lat, lon)
                 P1_pos.append([E, N, alt])
-                print(f"Used fallback transformer for position: {lat}, {lon}, {alt}")
-            except Exception as fallback_error:
-                print(f"Fallback transformation also failed: {fallback_error}")
-                P1_pos.append([None, None, None])
+                logging.warning(f"Used pyproj fallback for position {i}: lat={lat}, lon={lon}")
+            except Exception as e:
+                logging.error(f"Both API and pyproj failed for position {i}: {e}")
+                P1_pos.append([0.0, 0.0, 0.0])
+
+        if (i + 1) % 50 == 0 or (i + 1) == total:
+            print(f"Transformed {i+1}/{total} P1 positions")
+
+    P1_pos = np.array(P1_pos)
  
         
     # Create output MicaSense position csv 
