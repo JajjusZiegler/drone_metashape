@@ -6,7 +6,7 @@ from pathlib import Path
 
 # Configuration
 csv_file_path = input("Enter the path to the CSV file: ")
-target_script_path = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\DEMtests.py"
+target_script_path = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\metashape_proc_upscale_main.py"  # formerly DEMtests.py
 HARDCODED_CRS = "2056"
 TEST_FLAG_ENABLED = False
 SIMULATION_MODE = True  # Set to True to simulate instead of running subprocess

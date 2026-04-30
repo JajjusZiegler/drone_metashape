@@ -1,74 +1,73 @@
 # -*- coding: utf-8 -*-
-# DEPRECATED – this file has been renamed to metashape_proc_upscale_main.py
-# Please use metashape_proc_upscale_main.py going forward.
-# This file is kept only for backwards compatibility with older run-scripts.
-"""""
-This script processes images captured by DJI Zenmuse P1 (gimbal 1) and MicaSense RedEdge-MX/Dual (gimbal 2) sensors 
-using the Matrice 300 RTK drone system. It assumes a specific folder structure as per TERN protocols and provides 
-options to override raw data paths.
-The script performs the following tasks:
-1. Adds RGB and multispectral images to the Metashape project.
-2. Stops for user input on calibration images.
-3. Resumes processing to complete the workflow, including:
-    - Blockshifting P1 (RGB camera) coordinates if required.
-    - Converting coordinates to the target CRS.
-    - Checking image quality and removing low-quality images.
-    - Applying GPS/INS offsets.
-    - Aligning images.
-    - Building dense clouds and models.
-    - Smoothing and exporting models.
-    - Building and exporting orthomosaics.
-    - Calibrating reflectance for multispectral images.
-Functions:
-    - cartesian_to_geog(X, Y, Z): Converts Cartesian coordinates to geographic coordinates using WGS84 ellipsoid.
-    - find_files(folder, types): Finds files of specified types in a folder.
-    - copyBoundingBox(from_chunk_label, to_chunk_labels): Copies bounding box from one chunk to others.
-    - proc_rgb(): Processes RGB images to create orthomosaic and 3D model.
-    - proc_multispec(): Processes multispectral images to create orthomosaic with relative reflectance.
-    - resume_proc(): Resumes processing after user input on calibration images.
-Usage:
-    Run the script with the required and optional inputs as arguments. Follow the instructions in the console to 
-    complete the calibration steps and resume processing.
-"""""
 """
-Created August 2021
+metashape_proc_upscale_main.py
+==============================
+Main Metashape processing pipeline for the UPSCALE drone campaign.
 
-@author: Poornima Sivanandam
+This script is the primary processing engine for DJI Zenmuse P1 (RGB, gimbal 1)
+and MicaSense RedEdge-MX/Dual (multispectral, gimbal 2) images captured on the
+Matrice 300 RTK drone system.  It is invoked as a subprocess by batch_processor.py
+(formerly EnhancedUpscaleProcessor.py) and by the legacy run-scripts.
 
-Script to process DJI Zenmuse P1 (gimbal 1) and MicaSense RedEdge-MX/Dual (gimbal 2) images captured simultaneously
-using the Matrice 300 RTK drone system.
+NOTE: This file was previously named DEMtests.py.  That name was a historical
+      artefact from early DEM-export experiments; the file has grown into the
+      complete production pipeline and is renamed here for clarity.
 
-Assumption that folder structure is as per the TERN protocols:
-Data |	Path | Example
-Raw data |	<plot>/YYYYMMDD/imagery/<sensor>/level0_raw/ |	SASMDD0001/20220519/imagery/rgb/level0_raw
-Data products |	<plot>/YYYYMMDD/imagery/<sensor>/level1_proc/	| SASMDD0001/20220519/imagery/multispec/level1_proc
-Metashape project |	plot/YYYYMMDD/imagery/metashape| SASRIV0001/20220516/imagery/metashape/
-DRTK logs | plot/YYYYMMDD/drtk/
+Processing steps
+----------------
+1.  Open an existing Metashape .psx project supplied via -proj_path.
+2.  proc_rgb():
+    - Optional blockshift of P1 positions using DRTK/AUSPOS offset (-drtk).
+    - CRS conversion to the target projected system (-crs, default Swiss LV95 2056).
+    - Image quality analysis; remove cameras below threshold.
+    - Apply GPS/INS lever-arm offsets for gimbal 1.
+    - Align photos (downscale depends on -test flag).
+    - Gradual selection on reprojection error + camera optimisation.
+    - Build point cloud, mesh (HeightField), decimate + smooth mesh.
+    - Export smoothed .obj model.
+    - Build and export RGB orthomosaic (model-based or DEM-based).
+    - Build and export DEM.
+    - Export processing report PDF.
+3.  proc_multispec():
+    - Interpolate MicaSense camera positions from P1 MRK timestamps.
+    - Delete images outside P1 capture window.
+    - Set primary channel (NIR or Panchro depending on sensor model).
+    - Apply GPS/INS lever-arm offsets for gimbal 2.
+    - Calibrate reflectance (panels + optional sun sensor).
+    - Align photos + camera optimisation.
+    - Import smoothed RGB mesh; build and export multispectral orthomosaic.
+    - Export processing report PDF.
 
-Raw data paths can be overriden using 'Optional Inputs'.
+Required argument
+-----------------
+    -proj_path   Path to existing Metashape .psx project file.
+    -date        Flight date in YYYYMMDD format.
+    -site        Site name (used in output file prefixes).
+    -crs         EPSG code for the target projected CRS (e.g. 2056 for Swiss LV95).
 
-Required Input:
-    -crs "<EPSG code for target projected coordinate reference system. Also used in MicaSense position interpolation>"
-    Example: -crs "7855"
-    See https://epsg.org/home.html
+Optional arguments
+------------------
+    -rgb         Path to RGB/P1 raw-image folder (contains .JPG/.TIF and .MRK files).
+    -multispec   Path to MicaSense raw-image folder.
+    -smooth      Mesh smoothing strength: low / medium / high  (default: medium).
+    -drtk        Path to DRTK base-station coordinate file for P1 blockshift.
+    -sunsens     Flag: use sun-sensor data during reflectance calibration.
+    -test        Flag: use lower quality settings for fast debug runs.
+    -multionly   Flag: skip RGB processing, run multispectral chunk only.
 
-Optional Inputs:
-    1. -multispec "path to multispectral level0_raw folder containing raw data"
-        Default is relative to project location: ../multispec/level0_raw/
-    2. -rgb "path to RGB level0_raw folder which also has the MRK file(s)"
-        Default is relative to project location: ../rgb/level0_raw/
-    3. -smooth "<low/medium/high>"
-        Strength value to smooth RGB model. Default is low.
-        Low: for low-lying vegetation (grasslands, shrublands), Medium and high: as appropriate for forested sites.
-    4. When P1 (RGB camera) coordinates have to be blockshifted:
-        - Path to file containing DRTK init and AUSPOS cartesian coords passed using "-drtk <path to file>".
-
-Summary:
-    * Add RGB and multispectral images.
-    * Stop script for user input on calibration images.
-    * When 'Resume Processing' is clicked complete the processing workflow.
-
+Key functions
+-------------
+    cartesian_to_geog(X, Y, Z)              WGS84 Cartesian -> Lat/Lon/h
+    find_files(folder, types)               Recursive file search by extension
+    copyBoundingBox(from_chunk, to_chunk)   Copy Metashape region between chunks
+    export_rgb_dem_ortho(...)               Export DEM(s) + ortho(s) for RGB chunk
+    process_multispec_ortho_from_dems(...) Load RGB DEMs into multispec chunk
+    proc_rgb()                              Full RGB processing pipeline
+    proc_multispec(rgb_dem_files)           Full multispectral processing pipeline
+    resume_proc()                           Entry-point called from __main__
 """
+
+# Original author: Poornima Sivanandam (created August 2021)
 
 import argparse
 import math

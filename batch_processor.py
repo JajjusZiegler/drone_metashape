@@ -1,31 +1,40 @@
 """
-DEPRECATED – this file has been renamed to batch_processor.py
-Please use batch_processor.py going forward.
-This file is kept only for backwards compatibility.
+batch_processor.py
+==================
+Batch orchestrator for the UPSCALE Metashape processing campaign.
 
-Enhanced Upscale Processor for Metashape Projects
-==================================================
+NOTE: This file was previously named EnhancedUpscaleProcessor.py.  The old name
+      described an internal implementation detail ("enhanced" vs an earlier draft)
+      rather than the script's actual role, so it is renamed here for clarity.
 
-A robust batch processor that validates all paths before processing and provides
-clear feedback on project status and potential issues.
+This script does NOT call Metashape directly.  It acts as a supervisor that
+reads a project CSV, validates paths and prior outputs, then launches
+metashape_proc_upscale_main.py (formerly DEMtests.py) as a subprocess via
+the Metashape-bundled Python interpreter for each project in turn.
 
-Features:
-- Comprehensive path validation before processing starts
-- Test mode (dry-run) to validate without processing
-- Detailed logging per project
-- Timeout protection
-- Clear progress reporting
-- Handles missing/partial data gracefully
+Features
+--------
+- Comprehensive path validation before any processing starts
+- Detects already-processed projects (checks for ortho TIFs, .obj, PDF reports)
+- Interactive menu: process unprocessed / incomplete / all projects
+- Per-project log files written to <project_dir>/logs/consolelog/
+- Timeout protection (default 60 min per project; configurable)
+- Test / dry-run mode (--test) for validation without actual processing
+- Results CSV written after the batch run
 
-Usage:
-    python EnhancedUpscaleProcessor.py input.csv
-    python EnhancedUpscaleProcessor.py input.csv --test  # Dry-run mode
-    python EnhancedUpscaleProcessor.py input.csv --timeout 7200  # 2 hour timeout
+Usage
+-----
+    python batch_processor.py input.csv
+    python batch_processor.py input.csv --test          # Dry-run / validation only
+    python batch_processor.py input.csv --timeout 7200  # 2 hour timeout per project
+    python batch_processor.py input.csv --crs 2056 --smooth medium
 
-CSV Format Required:
-    Columns: date, site, project_path, rgb_data_path, multispec_data_path, sunsens (optional)
-    
-Author: GitHub Copilot
+CSV format required
+-------------------
+    Mandatory columns : date, site, project_path
+    Data-path columns : rgb  (or rgb_data_path)  AND  multispec (or multispec_data_path)
+    Optional columns  : sunsens
+
 Date: 2025-12-27
 """
 
@@ -48,7 +57,7 @@ from enum import Enum
 # ============================================================================
 
 METASHAPE_PYTHON_PATH = r"C:\Program Files\Agisoft\Metashape Pro\python\python.exe"
-TARGET_SCRIPT_PATH = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\DEMtests.py"
+TARGET_SCRIPT_PATH = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\metashape_proc_upscale_main.py"
 DEFAULT_CRS = "2056"  # Swiss coordinate system
 DEFAULT_TIMEOUT = 3600  # 60 minutes in seconds
 DEFAULT_SMOOTH = "medium"  # low/medium/high
@@ -354,7 +363,7 @@ def read_and_validate_csv(csv_path: str, count_images_flag: bool = True) -> Tupl
 
 def setup_main_logger() -> logging.Logger:
     """Set up the main script logger"""
-    logger = logging.getLogger('EnhancedProcessor')
+    logger = logging.getLogger('BatchProcessor')
     logger.setLevel(logging.INFO)
     
     # Console handler
@@ -678,13 +687,13 @@ def save_results_csv(projects: List[ProjectData], results: List[Dict], output_pa
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Enhanced Upscale Processor with comprehensive validation',
+        description='Batch processor for UPSCALE Metashape projects',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python EnhancedUpscaleProcessor.py projects.csv
-  python EnhancedUpscaleProcessor.py projects.csv --test
-  python EnhancedUpscaleProcessor.py projects.csv --crs 7855 --timeout 7200
+  python batch_processor.py projects.csv
+  python batch_processor.py projects.csv --test
+  python batch_processor.py projects.csv --crs 7855 --timeout 7200
         """
     )
     
