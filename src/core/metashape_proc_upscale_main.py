@@ -887,7 +887,7 @@ def proc_multispec(rgb_dem_files):
             logging.warning(f"Failed to load existing Micasense position CSV: {MICASENSE_CAM_CSV}. Error: {e}")
             print("Falling back to ret_micasense_pos function to generate positions.")
             logging.info("Falling back to ret_micasense_pos function to generate positions.")
-            ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
+            ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec, htrans_path=args.htrans)
             chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
                                   delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
             chunk.crs = target_crs
@@ -898,15 +898,16 @@ def proc_multispec(rgb_dem_files):
         logging.info(f"Micasense position CSV does not exist: {MICASENSE_CAM_CSV}")
         print("Using ret_micasense_pos function to generate positions.")
         logging.info("Using ret_micasense_pos function to generate positions.")
-        ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV_UPDATED), P1_shift_vec)
+        ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV_UPDATED), P1_shift_vec, htrans_path=args.htrans)
         chunk.importReference(str(MICASENSE_CAM_CSV_UPDATED), format=Metashape.ReferenceFormatCSV, columns="nxyz",
                                 delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
         chunk.crs = target_crs
         doc.save()
 
     # # Interpolate Micasense positions and apply transformations
-    # ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec)
-    # #TransformHeight.process_csv(input_file=str(MICASENSE_CAM_CSV), output_file=str(MICASENSE_CAM_CSV_UPDATED), geoid_path=str(GEOID_PATH))
+    # ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec, htrans_path=args.htrans)
+    # # TransformHeight.process_csv is no longer needed: heights come from wgs84tolv95 API (LN02)
+    # # and are optionally corrected to LHN95 inside ret_micasense_pos via htrans_path.
     
     # # Load updated positions into Metashape
     # chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
@@ -1163,6 +1164,10 @@ parser.add_argument('-rgb', help='path to RGB level0_raw folder that also has th
 parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh low/med/high', default="medium")
 parser.add_argument('-drtk', help='If RGB coordinates to be blockshifted, file containing \
                                                   DRTK base station coordinates from field and AUSPOS', default=None)
+parser.add_argument('-htrans', help='Path to Swisstopo CHGeo2004 htrans GeoTIFF '
+                                    '(chgeo2004_htrans_ETRS89.tif or equivalent). '
+                                    'When provided, camera heights are converted from LN02 to LHN95.',
+                    default=None)
 parser.add_argument('-sunsens', help='use sun sensor data for reflectance calibration', action='store_true')
 parser.add_argument('-test', help='make processing faster for debugging', action='store_true')
 parser.add_argument('-multionly', help='process multispec chunk only', action='store_true')
@@ -1281,6 +1286,15 @@ if args.drtk is not None:
     DRTK_TXT_FILE = args.drtk
     if not Path(DRTK_TXT_FILE).is_file():
         sys.exit("%s file does not exist. Check and input correct path using -drtk option" % str(DRTK_TXT_FILE))
+
+if args.htrans is not None:
+    if not Path(args.htrans).is_file():
+        sys.exit("%s file does not exist. Check and input correct path using -htrans option" % str(args.htrans))
+    logging.info(f"LN02→LHN95 htrans correction enabled using: {args.htrans}")
+    print(f"LN02→LHN95 htrans correction enabled using: {args.htrans}")
+else:
+    logging.info("No htrans file provided. Heights will be LN02 (from wgs84tolv95 API).")
+    print("No htrans file provided. Heights will be LN02 (from wgs84tolv95 API).")
 
 if args.smooth not in DICT_SMOOTH_STRENGTH:
     sys.exit("Value for -smooth must be one of low, medium or high.")

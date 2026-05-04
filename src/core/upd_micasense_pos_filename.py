@@ -25,6 +25,8 @@ import numpy as np
 import exifread
 import datetime
 import requests
+import rasterio
+import pyproj
 from pyproj.transformer import TransformerGroup
 from datetime import datetime, timedelta
 import logging
@@ -98,6 +100,50 @@ def transform_coordinates(lon, lat, alt=None, max_retries=3, delay=0.15):
                 time.sleep(1.0)  # longer back-off before retry
     print(f"Error in transform_coordinates for lon: {lon}, lat: {lat}: all {max_retries} attempts failed")
     return None
+
+
+def apply_htrans_correction(lon, lat, ln02_height, htrans_path):
+    """
+    Apply the LN02 → LHN95 height correction using the Swisstopo CHGeo2004 htrans grid.
+
+    The htrans GeoTIFF (chgeo2004_htrans_ETRS*.tif or equivalent) stores the height delta
+    delta = H_LHN95 - H_LN02 at each grid cell.  The corrected height is therefore:
+        h_LHN95 = h_LN02 + delta
+
+    Parameters
+    ----------
+    lon : float
+        Longitude in WGS84 (EPSG:4326).
+    lat : float
+        Latitude in WGS84 (EPSG:4326).
+    ln02_height : float
+        LN02 orthometric height returned by the Swisstopo wgs84tolv95 API (metres).
+    htrans_path : str
+        Path to the htrans correction GeoTIFF.
+
+    Returns
+    -------
+    float
+        LHN95 orthometric height, or ln02_height unchanged if sampling fails.
+    """
+    try:
+        with rasterio.open(htrans_path) as ds:
+            # Transform WGS84 lon/lat to the CRS of the htrans grid if needed
+            grid_crs = ds.crs
+            wgs84 = pyproj.CRS("EPSG:4326")
+            if grid_crs and not grid_crs.equals(wgs84):
+                transformer = pyproj.Transformer.from_crs(wgs84, grid_crs, always_xy=True)
+                sample_x, sample_y = transformer.transform(lon, lat)
+            else:
+                sample_x, sample_y = lon, lat
+
+            for val in ds.sample([(sample_x, sample_y)]):
+                delta = float(val[0])
+                return ln02_height + delta
+    except Exception as e:
+        logging.warning(f"apply_htrans_correction failed for lon={lon}, lat={lat}: {e}. Using LN02 height unchanged.")
+    return ln02_height
+
 
 def get_transformed_P1_positions(mrk_file):
     """
@@ -240,7 +286,7 @@ def get_P1_position(MRK_file, file_count):
         P1_pos_mrk.append([lat, lon, ellh])
 
     
-def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder, image_suffix, epsg_crs, out_file, P1_shift_vec):
+def ret_micasense_pos(absolute_micasense_file_list, mrk_folder, micasense_folder, image_suffix, epsg_crs, out_file, P1_shift_vec, htrans_path=None):
     """
     Parameters
     ----------
@@ -261,7 +307,12 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
     out_file : string
         Path and name of output CSV file with udpated Easting/Norhting/Altitude for all MicaSense images
     P1_shift_vec : vector
-        Vector to be used to blockshift P1 positions. 
+        Vector to be used to blockshift P1 positions.
+    htrans_path : str or None
+        Optional path to the Swisstopo CHGeo2004 htrans GeoTIFF
+        (e.g. chgeo2004_htrans_ETRS89.tif).  When provided, heights are
+        converted from LN02 (returned by the wgs84tolv95 API) to LHN95 by
+        adding the grid delta.  When None, LN02 heights are written as-is.
 
     Returns
     -------
@@ -456,7 +507,11 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
         result = transform_coordinates(lon, lat, alt)
 
         if result:
-            P1_pos.append([result["easting"], result["northing"], result["altitude"]])
+            h = result["altitude"]
+            # Apply LN02 → LHN95 correction if an htrans grid is provided
+            if htrans_path:
+                h = apply_htrans_correction(lon, lat, h, htrans_path)
+            P1_pos.append([result["easting"], result["northing"], h])
         else:
             # Fallback to pyproj transformer if API fails
             try:
@@ -475,8 +530,9 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
         
     # Create output MicaSense position csv 
     out_frame = open(out_file, 'w', encoding='utf-8')
-    # write header row
-    rec = ("Label, Easting, Northing, LHN95 Height\n")
+    # write header row: heights are LHN95 when htrans_path is provided, otherwise LN02
+    height_label = "LHN95 Height" if htrans_path else "LN02 Height"
+    rec = (f"Label, Easting, Northing, {height_label}\n")
     print("Writing to file: ", rec)
     out_frame.write(rec) 
     
@@ -553,9 +609,8 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
         # Interpolate the altitude (Z) from the P1 data:
         interp_h = upd_pos1[2] + time_delta * (upd_pos2[2] - upd_pos1[2])
 
-            # No additional vertical datum conversion is needed here.
-            # The Swisstopo API (wgs84tolv95) returns an LN02 orthometric height
-            # (~3–10 cm accuracy via HTRANS) which is used directly.
+            # Interpolated height is LHN95 when htrans_path was supplied to ret_micasense_pos,
+            # otherwise it is the LN02 orthometric height returned by the wgs84tolv95 API.
 
         # Combine into a new interpolated position vector for the MicaSense image:
         upd_micasense_pos = [interp_E, interp_N, interp_h]
@@ -565,12 +620,12 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
         
         pos_index = mica_events.index(m_cam_time)
 
-        # For images captured within P1 times, write updated Easting, Northing, LN02 orthometric height to CSV
+        # For images captured within P1 times, write updated Easting, Northing, orthometric height to CSV
         if(upd_micasense_pos[2] != 0):
                         rec = ("%s, %10.6f, %10.6f, %10.4f\n" % \
                                 (image_name, upd_micasense_pos[0], upd_micasense_pos[1], upd_micasense_pos[2]))
         else:
-                        # For MicaSense images captured outside P1 times, just save original Easting, Northing. BUT set LN02 height to 0 
+                        # For MicaSense images captured outside P1 times, just save original Easting, Northing. Set height to 0
                         # to filter and delete these cameras
                         rec = ("%s, %10.6f, %10.6f, %10.4f\n" % \
                                 (image_name, mica_pos[pos_index][0], mica_pos[pos_index][1], upd_micasense_pos[2]))
