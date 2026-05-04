@@ -54,7 +54,8 @@ EPSG_4326 = 4326
 # The plain wgs84tolv95 endpoint returns LN02 altitude instead (~3–10 cm via HTRANS) and should not
 # be used when best vertical accuracy is required.
 # The old wgs84tolv03 (LV03/CH1903) endpoint introduces a ~1–3 m horizontal offset and must not be used.
-API_URL = "https://geodesy.geo.admin.ch/reframe/wgs84tolv95lhn95"
+# Note: geodesy.geo.admin.ch has been retired; the current REST base is api3.geo.admin.ch/rest/services/reframe/.
+API_URL = "https://api3.geo.admin.ch/rest/services/reframe/wgs84tolv95lhn95"
 
 ###############################################################################
 # Functions
