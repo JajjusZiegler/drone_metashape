@@ -56,6 +56,12 @@ class TestRootFiles(unittest.TestCase):
     def test_gitignore(self):
         self.assertTrue((REPO_ROOT / ".gitignore").exists(), ".gitignore missing")
 
+    def test_geoid_audit(self):
+        self.assertTrue(
+            (REPO_ROOT / "geoid_audit.py").exists(),
+            "geoid_audit.py missing from repo root",
+        )
+
 
 class TestSrcCore(unittest.TestCase):
     """src/core/ must contain all main processing scripts."""
@@ -227,6 +233,40 @@ class TestSysPathFixes(unittest.TestCase):
                 "Path(__file__).parent",
             ),
             "UpscaleRunScript.py target_script_path should use Path(__file__).parent",
+        )
+
+    def test_upd_micasense_pos_uses_lv95_api(self):
+        """Position interpolation must use the LV95 (modern) reframe endpoint."""
+        p = REPO_ROOT / "src/core/upd_micasense_pos_filename.py"
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        self.assertIn(
+            "wgs84tolv95",
+            text,
+            "upd_micasense_pos_filename.py should use wgs84tolv95 API (not wgs84tolv03)",
+        )
+        self.assertNotIn(
+            '"https://geodesy.geo.admin.ch/reframe/wgs84tolv03"',
+            text,
+            "upd_micasense_pos_filename.py must not use the old wgs84tolv03 API as its active URL",
+        )
+
+    def test_requirements_includes_rasterio(self):
+        """rasterio must be in requirements.txt (needed by TransformHeight.py and geoid_audit.py)."""
+        p = REPO_ROOT / "requirements.txt"
+        self.assertTrue(
+            "rasterio" in p.read_text(encoding="utf-8"),
+            "requirements.txt must list rasterio (needed by TransformHeight.py and geoid_audit.py)",
+        )
+
+    def test_batch_processor_has_argparse(self):
+        """batch_processor.py must use argparse (csv_file positional argument)."""
+        self.assertTrue(
+            self._file_contains("src/core/batch_processor.py", "argparse"),
+            "batch_processor.py should use argparse for CLI arguments",
+        )
+        self.assertTrue(
+            self._file_contains("src/core/batch_processor.py", "DEFAULT_CRS"),
+            "batch_processor.py should define DEFAULT_CRS constant",
         )
 
 

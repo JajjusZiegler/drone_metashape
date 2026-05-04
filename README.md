@@ -79,6 +79,8 @@ tests/
 └── test_setup_paths.py          # Setup path validation test
 
 archive/                         # Deprecated scripts (reference only)
+
+geoid_audit.py                   # Standalone Swiss geoid / height audit tool
 ```
 
 ## Installation
@@ -128,27 +130,39 @@ python scripts\testing\test_metashape_installation.py
 2. *(Optional)* Place `src/project_management/OpenProjectsfromCSV.py` in
    `C:\Program Files\Agisoft\Metashape Pro\scripts\` and use
    *Scripts → Select Project from CSV* to set reflectance panels.
-3. **Run batch processing** (interactive — the script will prompt for the CSV path):
+3. **Run batch processing**:
    ```bash
-   python src/core/batch_processor.py
+   python src/core/batch_processor.py input.csv
+   python src/core/batch_processor.py input.csv --test           # dry-run / validation
+   python src/core/batch_processor.py input.csv --crs 2056       # override CRS (default: 2056)
+   python src/core/batch_processor.py input.csv --timeout 7200   # 2-hour timeout
+   python src/core/batch_processor.py input.csv --smooth high
    ```
-   If recent `unprocessed_projects_*.csv` files are found in the default project
-   directory the script lists them and lets you pick one; otherwise it prompts for
-   a full path.
 
    > **Note:** `batch_processor.py` spawns `metashape_proc_upscale_main.py` using
    > the **Metashape Python interpreter** (default:
    > `C:\Program Files\Agisoft\Metashape Pro\python\python.exe`).
-   > If Metashape is installed elsewhere, edit the `metashape_python_path` constant
+   > If Metashape is installed elsewhere, edit the `METASHAPE_PYTHON_PATH` constant
    > near the top of `src/core/batch_processor.py`.
-   > The target CRS (default `2056` — Swiss LV95) is set via the `HARDCODED_CRS`
-   > constant in the same file.
 
 ### CSV Format
 
 Required columns: `date`, `site`, `project_path`  
 Image-path columns (either form is accepted): `rgb` / `rgb_data_path`, `multispec` / `multispec_data_path`  
 Optional column: `sunsens` (set to `true` to enable sun-sensor reflectance calibration)
+
+### Geoid / Height Audit
+
+`geoid_audit.py` at the repo root is a standalone diagnostic that verifies the
+height pipeline for a specific flight.  It requires an internet connection (for
+the Swisstopo reframe API) but does **not** require Metashape:
+
+```bash
+python geoid_audit.py --image path/to/P1_image.JPG --geoid_ln02 path/to/chgeo2004_ETRS89_LN02.tif
+# optional extras:
+python geoid_audit.py --image ... --mrk path/to/flight.MRK --dsm path/to/dsm.tif \
+    --geoid_ln02 path/to/LN02.tif --geoid_lhn95 path/to/LHN95.tif
+```
 
 ### Other Examples
 

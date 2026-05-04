@@ -48,8 +48,11 @@ MICA_deltat = -18
 EPSG_4326 = 4326
 
 
-# API endpoint for the Swisstopo transformation
-API_URL = "https://geodesy.geo.admin.ch/reframe/wgs84tolv03"
+# API endpoint for the Swisstopo transformation.
+# wgs84tolv95 returns CH1903+/LV95 horizontal coordinates (EPSG:2056) + LN02 altitude,
+# which is the correct modern Swiss datum.  The old wgs84tolv03 (LV03/CH1903) endpoint
+# introduces a ~1–3 m horizontal offset and should not be used for EPSG:2056 targets.
+API_URL = "https://geodesy.geo.admin.ch/reframe/wgs84tolv95"
 
 ###############################################################################
 # Functions

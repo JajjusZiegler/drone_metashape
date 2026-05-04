@@ -47,8 +47,8 @@ from pyproj import Transformer
 # ---------------------------------------------------------------------------
 # Swisstopo reframe API endpoints
 # ---------------------------------------------------------------------------
-API_LV03 = "https://geodesy.geo.admin.ch/reframe/wgs84tolv03"   # → CH1903/LV03 + LN02  (what DEMtests.py currently uses)
-API_LV95 = "https://geodesy.geo.admin.ch/reframe/wgs84tolv95"   # → CH1903+/LV95 + LN02 (what should be used for EPSG:2056)
+API_LV03 = "https://geodesy.geo.admin.ch/reframe/wgs84tolv03"   # → CH1903/LV03 + LN02  (old system, ~1–3 m offset vs LV95)
+API_LV95 = "https://geodesy.geo.admin.ch/reframe/wgs84tolv95"   # → CH1903+/LV95 + LN02 (current pipeline, correct for EPSG:2056)
 
 # Default geoid path (matches the hardcoded path in DEMtests.py)
 DEFAULT_GEOID_LN02 = (
@@ -335,11 +335,13 @@ def print_report(r):
     if r.get("lv03") and r.get("lv95") and r["lv03"][0] and r["lv95"][0]:
         de = abs(r["lv95"][0] - r["lv03"][0])
         dn = abs(r["lv95"][1] - r["lv03"][1])
+        # Pipeline now uses wgs84tolv95 (LV95/CH1903+) — check if LV03 and LV95 still differ
+        # significantly, which would indicate whether using LV03 data would have been a problem.
         if de > 0.5 or dn > 0.5:
-            issues.append(
-                f"  ⚠  Pipeline uses wgs84tolv03 (LV03/old CH1903) in upd_micasense_pos_filename.py\n"
-                f"     but Metashape target CRS is LV95 (EPSG:2056/CH1903+).\n"
-                f"     Horizontal offset: ΔE={de:+.3f} m, ΔN={dn:+.3f} m  across your site."
+            ok.append(
+                f"  ✓  Pipeline uses wgs84tolv95 (LV95/CH1903+) — correct for EPSG:2056.\n"
+                f"     For reference, the LV03 offset at this location would have been:\n"
+                f"     ΔE={de:+.3f} m, ΔN={dn:+.3f} m  (this error is now avoided)."
             )
         else:
             ok.append("  ✓  LV03 vs LV95 horizontal offset is negligible at this location.")
@@ -363,9 +365,9 @@ def print_report(r):
 
     # Issue 3: TransformHeight commented out
     issues.append(
-        "  ⚠  TransformHeight.process_csv() is COMMENTED OUT in DEMtests.py.\n"
+        "  ⚠  TransformHeight.process_csv() is COMMENTED OUT in metashape_proc_upscale_main.py.\n"
         "     MicaSense positions receive no explicit geoid correction in the current pipeline.\n"
-        "     Heights come directly from the swisstopo API (LN02 via wgs84tolv03)."
+        "     Heights come directly from the swisstopo API (LN02 via wgs84tolv95)."
     )
 
     for msg in issues:

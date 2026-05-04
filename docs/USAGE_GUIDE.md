@@ -56,14 +56,16 @@ src/project_management/OpenProjectsfromCSV.py
 ### 4. Run Batch Processing
 
 ```bash
-python src/core/batch_processor.py
+python src/core/batch_processor.py input.csv
+python src/core/batch_processor.py input.csv --test           # dry-run / validation
+python src/core/batch_processor.py input.csv --crs 2056       # override CRS (default: 2056)
+python src/core/batch_processor.py input.csv --timeout 7200   # 2-hour per-project timeout
+python src/core/batch_processor.py input.csv --smooth high    # smoothing: low/medium/high
 ```
 
-The script is **interactive**: it scans for recent `unprocessed_projects_*.csv`
-files in the default project directory and lets you pick one, or prompts for a
-full path.  There are no command-line flags — the CRS and test-mode are
-controlled by the `HARDCODED_CRS` and `TEST_FLAG_ENABLED` constants at the top
-of `src/core/batch_processor.py`.
+The script validates all paths, shows a summary of ready / incomplete / processed projects,
+then presents an interactive menu so you can choose to process unprocessed, incomplete, or
+all projects.
 
 ---
 
@@ -71,22 +73,29 @@ of `src/core/batch_processor.py`.
 
 ### `src/core/batch_processor.py` — Batch Orchestrator
 
-Reads a project CSV, validates paths, and launches `metashape_proc_upscale_main.py`
-as a subprocess for each project.  Runs **interactively** — prompts for CSV path at
-startup (no command-line arguments).
+Reads a project CSV, validates all paths, and launches `metashape_proc_upscale_main.py`
+as a subprocess for each project via the Metashape Python interpreter.
 
 ```bash
-python src/core/batch_processor.py
+python src/core/batch_processor.py input.csv [--crs EPSG] [--test] [--timeout SECS] [--smooth LEVEL]
 ```
 
-**Configurable constants** (edit near the top of the file):
+**CLI arguments:**
+
+| Argument | Default | Description |
+|---|---|---|
+| `csv_file` | *(required)* | Path to input CSV |
+| `--crs` | `2056` | EPSG code for the target projected CRS (Swiss LV95 by default) |
+| `--smooth` | `medium` | Mesh smoothing strength: `low` / `medium` / `high` |
+| `--timeout` | `3600` | Per-project subprocess timeout in seconds |
+| `--test` | — | Dry-run: validate all paths without starting Metashape |
+| `--show-all` | — | Print all projects including already-processed ones |
+
+**Configurable constant** (edit near the top of the file):
 
 | Constant | Default | Description |
 |---|---|---|
-| `metashape_python_path` | `C:\Program Files\Agisoft\Metashape Pro\python\python.exe` | Metashape Python interpreter used to invoke the processing script |
-| `HARDCODED_CRS` | `"2056"` | EPSG code passed as `-crs` to each processing run |
-| `TEST_FLAG_ENABLED` | `False` | Set to `True` to append `-test` flag (lower quality, faster debug runs) |
-| `TIMEOUT_DURATION` | `3600` (60 min) | Per-project subprocess timeout in seconds |
+| `METASHAPE_PYTHON_PATH` | `C:\Program Files\Agisoft\Metashape Pro\python\python.exe` | Metashape-bundled Python used to invoke the processing script |
 
 **CSV columns accepted:** `date`, `site`, `project_path`, `rgb` (or `rgb_data_path`), `multispec` (or `multispec_data_path`). Optional: `sunsens`.
 
@@ -144,23 +153,48 @@ Converts ellipsoidal heights to orthometric heights using a geoid model.
 | `src/utilities/LocatePanels.py` | Locate reflectance panels |
 | `src/utilities/UpscaleMultispecProcessing.py` | Multispectral-only processing |
 
+### Geoid / Height Audit
+
+`geoid_audit.py` (at the repo root) is a standalone diagnostic that lets you
+verify the Swiss height pipeline for a specific flight **before** processing a
+full campaign.  It does not require Metashape and can be run in any Python
+environment that has the standard dependencies:
+
+```bash
+# Minimal (only --image is required):
+python geoid_audit.py --image "path/to/P1_image.JPG" --geoid_ln02 "path/to/chgeo2004_ETRS89_LN02.tif"
+
+# Full audit (recommended):
+python geoid_audit.py \
+    --image  "path/to/P1_image.JPG" \
+    --mrk    "path/to/flight.MRK" \
+    --dsm    "path/to/exported_dsm.tif" \
+    --geoid_ln02  "path/to/chgeo2004_ETRS89_LN02.tif" \
+    --geoid_lhn95 "path/to/chgeo2004_ETRS89_LHN95.tif"
+```
+
+The script queries both Swisstopo reframe endpoints (`wgs84tolv03` and
+`wgs84tolv95`) and reports discrepancies between the two, the manual CHGeo2004
+geoid correction, and the DSM pixel value so you can identify datum errors
+before they propagate into orthomosaics.
+
 ---
 
 ## Configuration
 
 ### Coordinate Systems
 
-Default is Swiss LV95 (`EPSG:2056`), set via the `HARDCODED_CRS` constant in
-`batch_processor.py`.  When invoking `metashape_proc_upscale_main.py` directly,
-pass `-crs <EPSG_code>`.
+Default is Swiss LV95 (`EPSG:2056`).  Override per run with `--crs <EPSG_code>` on
+the `batch_processor.py` command line, or pass `-crs <EPSG_code>` directly to
+`metashape_proc_upscale_main.py`.
 
 ### Processing Quality
 
-Controlled by the `-smooth` flag in `metashape_proc_upscale_main.py`: `low` / `medium` / `high`.
+Controlled by `--smooth` on `batch_processor.py` (`low` / `medium` / `high`), or
+`-smooth` directly on `metashape_proc_upscale_main.py`.
 
-For faster debug runs set `TEST_FLAG_ENABLED = True` in `batch_processor.py`
-(appends `-test` to each subprocess call, which uses lower quality settings in
-`metashape_proc_upscale_main.py`).
+Use `--test` on `batch_processor.py` for a dry-run that validates all paths and
+builds commands without starting Metashape.
 
 ### Sensor Offsets
 
