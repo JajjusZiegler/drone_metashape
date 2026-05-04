@@ -49,10 +49,12 @@ EPSG_4326 = 4326
 
 
 # API endpoint for the Swisstopo transformation.
-# wgs84tolv95 returns CH1903+/LV95 horizontal coordinates (EPSG:2056) + LN02 altitude,
-# which is the correct modern Swiss datum.  The old wgs84tolv03 (LV03/CH1903) endpoint
-# introduces a ~1–3 m horizontal offset and should not be used for EPSG:2056 targets.
-API_URL = "https://geodesy.geo.admin.ch/reframe/wgs84tolv95"
+# wgs84tolv95lhn95 returns CH1903+/LV95 horizontal coordinates (EPSG:2056) + LHN95 orthometric altitude
+# derived from the CHGeo2004 geoid model (1–3 cm vertical accuracy).
+# The plain wgs84tolv95 endpoint returns LN02 altitude instead (~3–10 cm via HTRANS) and should not
+# be used when best vertical accuracy is required.
+# The old wgs84tolv03 (LV03/CH1903) endpoint introduces a ~1–3 m horizontal offset and must not be used.
+API_URL = "https://geodesy.geo.admin.ch/reframe/wgs84tolv95lhn95"
 
 ###############################################################################
 # Functions
