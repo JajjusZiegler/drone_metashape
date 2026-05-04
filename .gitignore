@@ -1,51 +1,34 @@
-upd_micasense_pos_filename.py
-__pycache__/upd_micasense_pos_filename.cpython-39.pyc
-debugger_upd_micasense_pos_filename.py
-DEMtestsNOSAVING.py
-__pycache__/upd_micasense_pos_filename.cpython-39.pyc
-Proc_test.py
-debugger_upd_micasense_pos_filename.py
-debugger_upd_micasense_pos_filename.py
-csv_creation.log
-parent_script.log
-your_log_file.log
-__pycache__/upd_micasense_pos_filename.cpython-39.pyc
-csv_creation.log
-__pycache__/ScapeFileLocations.cpython-312.pyc
-RunScriptMultiOnly.py
-test_encoding.py
-test_utf8.txt
-CampaignMap.html
-analyze_csv_mismatch.py
-.gitignore
-cumulative_flight.csv
-.gitignore
-FlightDurationAggregator.py
-ORS_Test.py
-.gitignore
-traveled_km.csv
-.gitignore
-__pycache__/upd_micasense_pos_filename.cpython-39.pyc
-test_path_correction.py
-drone_file_check_20250901_132439.csv
-drone_file_check_20250901_132549.csv
-processing_arguments.csv
-filter_processed_flights.py
-launch_upscale.bat
-run_batch_processing.bat
-run_clean.bat
-run_script_with_conda.bat
-run_status_check.bat
-run_upscale_with_conda.bat
-run_with_conda.ps1
-test_environment.py
-test_excel_to_csv.py
-test_excel_debug.py
-UPSCALE_logbook_ALREADY_PROCESSED_flights.csv
-UPSCALE_logbook_multispectral_data.csv
-UPSCALE_logbook_RGBandMulti_data.csv
-UPSCALE_logbook_UNPROCESSED_flights.csv
-upscale_status_checker.py
-__pycache__/ExceltoCSV.cpython-312.pyc
-__pycache__/TransformHeight.cpython-39.pyc
-upd_micasense_pos_filename.py
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Logs
+*.log
+
+# Data and output files (generated, not source-controlled)
+*.csv
+*.json
+drone_file_check_*.csv
+
+# Large binary/wheel files
+*.zip
+*.whl
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Metashape project files (large binaries)
+*.psx
+*.files/
+
+# OS
+.DS_Store
+Thumbs.db
