@@ -57,7 +57,7 @@ from enum import Enum
 # ============================================================================
 
 METASHAPE_PYTHON_PATH = r"C:\Program Files\Agisoft\Metashape Pro\python\python.exe"
-TARGET_SCRIPT_PATH = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\metashape_proc_upscale_main.py"
+TARGET_SCRIPT_PATH = Path(__file__).parent / "metashape_proc_upscale_main.py"
 DEFAULT_CRS = "2056"  # Swiss coordinate system
 DEFAULT_TIMEOUT = 3600  # 60 minutes in seconds
 DEFAULT_SMOOTH = "medium"  # low/medium/high

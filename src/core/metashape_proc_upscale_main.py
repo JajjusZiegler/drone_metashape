@@ -78,18 +78,22 @@ import os
 import sys
 import exifread
 from collections import defaultdict
-from upd_micasense_pos_filename import ret_micasense_pos
 import importlib
-import upd_micasense_pos_filename
 import csv
 import logging
 from datetime import datetime
-import TransformHeight
 import requests
+from pathlib import Path
 
+# Ensure sibling modules (upd_micasense_pos_filename, TransformHeight) can be
+# found regardless of the working directory from which this script is invoked.
+sys.path.insert(0, str(Path(__file__).parent))
+
+from upd_micasense_pos_filename import ret_micasense_pos
+import upd_micasense_pos_filename
+import TransformHeight
 
 importlib.reload(upd_micasense_pos_filename)
-from pathlib import Path
 
 
 # Note: External modules imported were installed through:

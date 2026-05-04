@@ -50,12 +50,19 @@ import os
 import sys
 import exifread
 from collections import defaultdict
-from upd_micasense_pos_custom import ret_micasense_pos
 import importlib
+from pathlib import Path
+
+# upd_micasense_pos_custom lives in archive/ (legacy TERN version).
+# Add both src/core and archive to sys.path so the import resolves correctly.
+_REPO_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(_REPO_ROOT / 'archive'))
+
+from upd_micasense_pos_custom import ret_micasense_pos
 import upd_micasense_pos_custom
 
 importlib.reload(upd_micasense_pos_custom)
-from pathlib import Path
 
 # Note: External modules imported were installed through:
 # "C:\Program Files\Agisoft\Metashape Pro\python\python.exe" -m pip install <modulename>

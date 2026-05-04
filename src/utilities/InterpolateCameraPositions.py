@@ -15,6 +15,11 @@ import csv
 import os
 import time
 from pathlib import Path
+import sys
+
+# Ensure src/core (which contains upd_micasense_pos_filename) is on sys.path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'core'))
+
 from upd_micasense_pos_filename import ret_micasense_pos
 
 def get_master_band_paths_by_suffix(chunk, suffix="_6.tif"):
