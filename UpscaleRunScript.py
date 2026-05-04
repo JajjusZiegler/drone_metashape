@@ -56,7 +56,7 @@ if not os.path.exists(csv_file_path):
     
 print(f"✅ Using CSV file: {csv_file_path}")
 
-target_script_path = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\DEMtests.py"
+target_script_path = r"C:\Users\admin\Documents\Python Scripts\drone_metashape\metashape_proc_upscale_main.py"  # formerly DEMtests.py
 metashape_python_path = r"C:\Program Files\Agisoft\Metashape Pro\python\python.exe"
 HARDCODED_CRS = "2056"
 

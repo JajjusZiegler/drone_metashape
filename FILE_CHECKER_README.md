@@ -174,7 +174,7 @@ python simple_file_checker.py "E:\Share" > daily_check.log 2>&1
 
 These tools are designed to work with the existing drone processing scripts:
 - `metashape_proc_Upscale.py`
-- `DEMtests.py`
+- `metashape_proc_upscale_main.py` (formerly `DEMtests.py`)
 - Processing workflow scripts
 
 Run the file checker after batch processing to identify any failed or incomplete jobs.
