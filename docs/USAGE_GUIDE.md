@@ -56,10 +56,14 @@ src/project_management/OpenProjectsfromCSV.py
 ### 4. Run Batch Processing
 
 ```bash
-python src/core/batch_processor.py input.csv
-python src/core/batch_processor.py input.csv --test        # Dry-run / validation
-python src/core/batch_processor.py input.csv --timeout 7200
+python src/core/batch_processor.py
 ```
+
+The script is **interactive**: it scans for recent `unprocessed_projects_*.csv`
+files in the default project directory and lets you pick one, or prompts for a
+full path.  There are no command-line flags — the CRS and test-mode are
+controlled by the `HARDCODED_CRS` and `TEST_FLAG_ENABLED` constants at the top
+of `src/core/batch_processor.py`.
 
 ---
 
@@ -67,13 +71,24 @@ python src/core/batch_processor.py input.csv --timeout 7200
 
 ### `src/core/batch_processor.py` — Batch Orchestrator
 
-Reads a project CSV, validates paths, and launches `metashape_proc_upscale_main.py` as a subprocess for each project.
+Reads a project CSV, validates paths, and launches `metashape_proc_upscale_main.py`
+as a subprocess for each project.  Runs **interactively** — prompts for CSV path at
+startup (no command-line arguments).
 
 ```bash
-python src/core/batch_processor.py input.csv [--test] [--timeout SECS] [--crs EPSG]
+python src/core/batch_processor.py
 ```
 
-**CSV columns required:** `date`, `site`, `project_path`, `rgb` (or `rgb_data_path`), `multispec` (or `multispec_data_path`). Optional: `sunsens`.
+**Configurable constants** (edit near the top of the file):
+
+| Constant | Default | Description |
+|---|---|---|
+| `metashape_python_path` | `C:\Program Files\Agisoft\Metashape Pro\python\python.exe` | Metashape Python interpreter used to invoke the processing script |
+| `HARDCODED_CRS` | `"2056"` | EPSG code passed as `-crs` to each processing run |
+| `TEST_FLAG_ENABLED` | `False` | Set to `True` to append `-test` flag (lower quality, faster debug runs) |
+| `TIMEOUT_DURATION` | `3600` (60 min) | Per-project subprocess timeout in seconds |
+
+**CSV columns accepted:** `date`, `site`, `project_path`, `rgb` (or `rgb_data_path`), `multispec` (or `multispec_data_path`). Optional: `sunsens`.
 
 ### `src/core/metashape_proc_upscale_main.py` — Main Processing Pipeline
 
@@ -135,13 +150,17 @@ Converts ellipsoidal heights to orthometric heights using a geoid model.
 
 ### Coordinate Systems
 
-Default is Swiss LV95 (`EPSG:2056`). Override with `-crs <EPSG_code>` flag.
+Default is Swiss LV95 (`EPSG:2056`), set via the `HARDCODED_CRS` constant in
+`batch_processor.py`.  When invoking `metashape_proc_upscale_main.py` directly,
+pass `-crs <EPSG_code>`.
 
 ### Processing Quality
 
-Controlled by `-smooth` flag in `metashape_proc_upscale_main.py`: `low` / `medium` / `high`.
+Controlled by the `-smooth` flag in `metashape_proc_upscale_main.py`: `low` / `medium` / `high`.
 
-Use `-test` flag with `batch_processor.py` for a dry-run without actual Metashape processing.
+For faster debug runs set `TEST_FLAG_ENABLED = True` in `batch_processor.py`
+(appends `-test` to each subprocess call, which uses lower quality settings in
+`metashape_proc_upscale_main.py`).
 
 ### Sensor Offsets
 

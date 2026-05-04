@@ -128,16 +128,27 @@ python scripts\testing\test_metashape_installation.py
 2. *(Optional)* Place `src/project_management/OpenProjectsfromCSV.py` in
    `C:\Program Files\Agisoft\Metashape Pro\scripts\` and use
    *Scripts → Select Project from CSV* to set reflectance panels.
-3. **Run batch processing**:
+3. **Run batch processing** (interactive — the script will prompt for the CSV path):
    ```bash
-   python src/core/batch_processor.py input.csv
-   python src/core/batch_processor.py input.csv --test  # dry-run
+   python src/core/batch_processor.py
    ```
+   If recent `unprocessed_projects_*.csv` files are found in the default project
+   directory the script lists them and lets you pick one; otherwise it prompts for
+   a full path.
+
+   > **Note:** `batch_processor.py` spawns `metashape_proc_upscale_main.py` using
+   > the **Metashape Python interpreter** (default:
+   > `C:\Program Files\Agisoft\Metashape Pro\python\python.exe`).
+   > If Metashape is installed elsewhere, edit the `metashape_python_path` constant
+   > near the top of `src/core/batch_processor.py`.
+   > The target CRS (default `2056` — Swiss LV95) is set via the `HARDCODED_CRS`
+   > constant in the same file.
 
 ### CSV Format
 
-Required columns: `date`, `site`, `project_path`, `rgb`, `multispec`
-Optional column: `sunsens`
+Required columns: `date`, `site`, `project_path`  
+Image-path columns (either form is accepted): `rgb` / `rgb_data_path`, `multispec` / `multispec_data_path`  
+Optional column: `sunsens` (set to `true` to enable sun-sensor reflectance calibration)
 
 ### Other Examples
 
