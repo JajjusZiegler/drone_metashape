@@ -49,13 +49,11 @@ EPSG_4326 = 4326
 
 
 # API endpoint for the Swisstopo transformation.
-# wgs84tolv95lhn95 returns CH1903+/LV95 horizontal coordinates (EPSG:2056) + LHN95 orthometric altitude
-# derived from the CHGeo2004 geoid model (1–3 cm vertical accuracy).
-# The plain wgs84tolv95 endpoint returns LN02 altitude instead (~3–10 cm via HTRANS) and should not
-# be used when best vertical accuracy is required.
+# wgs84tolv95 returns CH1903+/LV95 horizontal coordinates (EPSG:2056) + LN02 orthometric altitude
+# (~3–10 cm vertical accuracy via HTRANS).
+# The wgs84tolv95lhn95 variant (LHN95/CHGeo2004 heights) does not exist on this server.
 # The old wgs84tolv03 (LV03/CH1903) endpoint introduces a ~1–3 m horizontal offset and must not be used.
-# Note: geodesy.geo.admin.ch has been retired; the current REST base is api3.geo.admin.ch/rest/services/reframe/.
-API_URL = "https://api3.geo.admin.ch/rest/services/reframe/wgs84tolv95lhn95"
+API_URL = "https://geodesy.geo.admin.ch/reframe/wgs84tolv95"
 
 ###############################################################################
 # Functions
@@ -556,8 +554,8 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
         interp_h = upd_pos1[2] + time_delta * (upd_pos2[2] - upd_pos1[2])
 
             # No additional vertical datum conversion is needed here.
-            # The Swisstopo API (wgs84tolv95lhn95) already converts the WGS84 ellipsoidal height
-            # to LHN95 orthometric height using the CHGeo2004 geoid model (1–3 cm accuracy).
+            # The Swisstopo API (wgs84tolv95) returns an LN02 orthometric height
+            # (~3–10 cm accuracy via HTRANS) which is used directly.
 
         # Combine into a new interpolated position vector for the MicaSense image:
         upd_micasense_pos = [interp_E, interp_N, interp_h]
@@ -567,12 +565,12 @@ def ret_micasense_pos(absolute_micasense_file_list,mrk_folder, micasense_folder,
         
         pos_index = mica_events.index(m_cam_time)
 
-        # For images captured within P1 times, write updated Easting, Northing, LHN95 orthometric height to CSV
+        # For images captured within P1 times, write updated Easting, Northing, LN02 orthometric height to CSV
         if(upd_micasense_pos[2] != 0):
                         rec = ("%s, %10.6f, %10.6f, %10.4f\n" % \
                                 (image_name, upd_micasense_pos[0], upd_micasense_pos[1], upd_micasense_pos[2]))
         else:
-                        # For MicaSense images captured outside P1 times, just save original Easting, Northing. BUT set LHN95 height to 0 
+                        # For MicaSense images captured outside P1 times, just save original Easting, Northing. BUT set LN02 height to 0 
                         # to filter and delete these cameras
                         rec = ("%s, %10.6f, %10.6f, %10.4f\n" % \
                                 (image_name, mica_pos[pos_index][0], mica_pos[pos_index][1], upd_micasense_pos[2]))
