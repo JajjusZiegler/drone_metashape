@@ -1,22 +1,197 @@
-## drone_metashape: RGB and Multispectral imagery processing in Agisoft Metashape Pro
-These workflows were developed for RGB and multispectral imagery collected simultaneously on DJI Matrice 300 platform. These scripts are designed for use with RGB imagery acquired with DJI Zenmuse P1 camera and multispectral imagery from MicaSense RedEdge-MX or Dual sensors. For more information please refer to the [Drone Data Collection Protocol](https://www.tern.org.au/field-survey-apps-and-protocols/). 
+# drone_metashape — Upscale Drone Processing
 
-One of the following workflows can be used to generate co-registered RGB and multispectral orthomosaics. For a summary of the processing steps and information on Agisoft Metashape setup, please refer to the [Drone RGB and Multispectral Processing Protocol](https://www.tern.org.au/field-survey-apps-and-protocols/). 
-1. Automated processing workflow  
-Uses scripts metashape_proc.py and upd_micasense_pos.py. 
-metashape_proc.py run from Metashape GUI to generate orthomosaics. User input is required to select images for MicaSense reflectance calibration. 
+RGB and Multispectral Imagery Processing in Agisoft Metashape Pro.
 
-2. Step-by-step procesing using the Metashape GUI  
-Uses scripts metashape_only_upd_cam_pos.py and upd_micasense_pos.py. 
-metashape_only_upd_cam_pos.py run as a part of the step-by-step workflow to update camera positions in the Metashape project. 
+## Overview
 
-3. Prototype only: custom widget within Metashape  
-This script is a prototype of an automated processing workflow through a custom widget within Metashape. For this option testing/metashape_proc_widget.py and upd_micasense_pos.py must be copied to C:\Users\<username>\AppData\Local\Agisoft\Metashape Pro\scripts\. For more information please refer to Appendix 5 in the [Drone RGB and Multispectral Processing Protocol](https://www.tern.org.au/field-survey-apps-and-protocols/). 
+These workflows process imagery collected simultaneously on the **DJI Matrice 300 RTK** platform using:
+- **DJI Zenmuse P1** (RGB, gimbal 1)
+- **MicaSense RedEdge-MX / Dual** (multispectral, gimbal 2)
 
-4. Other examples<br>
-examples\metashape_blockshift.py - code to only perform the blockshift of images in a Metashape chunk using AUSPOS results.  <br>
-examples\metashape_proc_p1.py - only process RGB images captured using Zenmuse P1 on **gimbal 1 of dual mount**. **Remove the GPS/INS offset code if P1 was on single mount gimbal.** <br>
+The pipeline produces co-registered RGB and multispectral orthomosaics, DEMs, and processing reports with Swiss coordinate system (EPSG:2056) support.
 
-**Funding**: This project was funded by TERN Landscapes  
-**Authors**: Poornima Sivanandam, Darren Turner, Arko Lucieer, School of Geography, Planning and Spatial Sciences, University of Tasmania  
-**Acknowledgements**: TERN Landscapes, TERN Surveillance, TERN Data Services
+## Key Features
+
+- **Batch Processing**: Process multiple campaigns from a single CSV
+- **Robust Path Resolution**: Handles naming mismatches between CSV and file system
+- **Swiss Coordinate Support**: Swisstopo API integration for coordinate transformation
+- **Quality Control**: Per-project logging and output validation
+
+## Project Structure
+
+```
+src/
+├── core/                        # Main processing scripts
+│   ├── batch_processor.py           # Batch orchestrator (reads CSV, calls processor)
+│   ├── UpscaleRunScript.py          # Simple single-run launcher
+│   ├── metashape_proc_upscale_main.py  # Full processing pipeline (Upscale)
+│   ├── metashape_proc.py            # Processing pipeline (generic/TERN)
+│   ├── upd_micasense_pos_filename.py   # MicaSense position interpolation
+│   └── TransformHeight.py           # Height/geoid transformation
+│
+├── project_management/          # Project creation and validation
+│   ├── CreateProjectsUpscale.py     # Create projects from CSV (standard)
+│   ├── CreateMultispectralProjects.py  # Multispectral-only project creation
+│   ├── UpscaleProjectCreation2025.py   # 2025 campaign project creation
+│   ├── UpscaleProjectCreation_ExtraMode.py  # Extra-mode project creation
+│   ├── initiate_project.py          # Low-level project initialisation
+│   ├── validate_projects.py         # Validate Metashape project paths
+│   └── OpenProjectsfromCSV.py       # Metashape GUI script (open from CSV)
+│
+├── utilities/                   # Helper scripts
+│   ├── InterpolateCameraPositions.py   # MicaSense position interpolation (fallback)
+│   ├── upd_micasense_pos.py         # Update positions in Metashape project
+│   ├── upd_micasense_pos_from_chunk.py # Update positions from chunk data
+│   ├── ret_micasense_pos_exiftool.py   # Retrieve positions via ExifTool
+│   ├── LocatePanels.py              # Locate reflectance panels
+│   └── UpscaleMultispecProcessing.py   # Multispectral-only processing
+│
+└── micasense/                   # MicaSense Python library
+    └── (capture, image, imageset, metadata, panel, dls, utils)
+
+scripts/
+├── setup/                       # Environment setup scripts
+│   ├── setup_conda_env.ps1          # PowerShell: create conda env (Python 3.11)
+│   ├── setup_conda_env.bat          # Batch: create conda env
+│   ├── setup_environment.py         # Python: validate installation
+│   ├── install_metashape.bat        # Install Metashape Python API wheel
+│   └── activate_environment.ps1    # Quick environment activation
+└── testing/                     # Testing and validation
+    ├── test_metashape_installation.py  # Comprehensive Metashape tests
+    ├── quick_metashape_check.py        # Quick Metashape check
+    ├── metashape_proc_widget_testing.py # GUI widget prototype
+    ├── run_tests_with_metashape.bat    # Test runner
+    ├── final_test.bat                  # End-to-end test suite
+    └── confirm_success.bat             # Success confirmation
+
+docs/                            # Documentation
+├── USAGE_GUIDE.md                   # Detailed usage instructions
+├── METASHAPE_INSTALLATION.md        # Metashape setup guide
+├── EXTRA_MODE_README.md             # Extra-mode documentation
+├── ROBUST_PROJECT_TOOLS_README.md   # Robust project tools guide
+└── metashape_python_api_2_1_0.pdf   # Metashape API reference
+
+examples/                        # Example scripts
+├── metashape_blockshift.py          # Blockshift using AUSPOS results
+└── metashape_proc_p1.py             # RGB-only (P1 single-mount) processing
+
+tests/
+└── test_setup_paths.py          # Setup path validation test
+
+archive/                         # Deprecated scripts (reference only)
+
+geoid_audit.py                   # Standalone Swiss geoid / height audit tool
+```
+
+## Installation
+
+### Prerequisites
+
+- **Agisoft Metashape Pro** license (required for processing)
+- **Python 3.8–3.11** ⚠️ Python 3.12+ is NOT supported by Metashape 2.1.4
+- **Anaconda / Miniconda** (recommended)
+
+### Quick Setup
+
+```powershell
+# 1. Clone
+git clone https://github.com/JajjusZiegler/drone_metashape.git
+cd drone_metashape
+
+# 2. Create compatible Python environment
+scripts\setup\setup_conda_env.ps1
+
+# 3. (In a new shell) Activate and install
+conda activate upscale-drone
+pip install -r requirements.txt
+
+# 4. Verify
+python scripts\setup\setup_environment.py
+python tests\test_setup_paths.py
+```
+
+### Metashape Python API
+
+See `docs/METASHAPE_INSTALLATION.md` for full details.
+
+```bash
+pip install wheels/Metashape-2.1.4-cp37.cp38.cp39.cp310.cp311-none-win_amd64.whl
+python scripts\testing\test_metashape_installation.py
+```
+
+## Usage
+
+### Automated Processing Workflow
+
+1. **Create projects** from CSV:
+   ```bash
+   python src/project_management/CreateProjectsUpscale.py input.csv
+   ```
+2. *(Optional)* Place `src/project_management/OpenProjectsfromCSV.py` in
+   `C:\Program Files\Agisoft\Metashape Pro\scripts\` and use
+   *Scripts → Select Project from CSV* to set reflectance panels.
+3. **Run batch processing**:
+   ```bash
+   python src/core/batch_processor.py input.csv
+   python src/core/batch_processor.py input.csv --test           # dry-run / validation
+   python src/core/batch_processor.py input.csv --crs 2056       # override CRS (default: 2056)
+   python src/core/batch_processor.py input.csv --timeout 7200   # 2-hour timeout
+   python src/core/batch_processor.py input.csv --smooth high
+   ```
+
+   > **Note:** `batch_processor.py` spawns `metashape_proc_upscale_main.py` using
+   > the **Metashape Python interpreter** (default:
+   > `C:\Program Files\Agisoft\Metashape Pro\python\python.exe`).
+   > If Metashape is installed elsewhere, edit the `METASHAPE_PYTHON_PATH` constant
+   > near the top of `src/core/batch_processor.py`.
+
+### CSV Format
+
+Required columns: `date`, `site`, `project_path`  
+Image-path columns (either form is accepted): `rgb` / `rgb_data_path`, `multispec` / `multispec_data_path`  
+Optional column: `sunsens` (set to `true` to enable sun-sensor reflectance calibration)
+
+### Geoid / Height Audit
+
+`geoid_audit.py` at the repo root is a standalone diagnostic that verifies the
+height pipeline for a specific flight.  It requires an internet connection (for
+the Swisstopo reframe API) but does **not** require Metashape:
+
+```bash
+python geoid_audit.py --image path/to/P1_image.JPG --geoid_ln02 path/to/chgeo2004_ETRS89_LN02.tif
+# optional extras:
+python geoid_audit.py --image ... --mrk path/to/flight.MRK --dsm path/to/dsm.tif \
+    --geoid_ln02 path/to/LN02.tif --geoid_lhn95 path/to/LHN95.tif
+```
+
+### Other Examples
+
+- `examples/metashape_blockshift.py` — blockshift images using AUSPOS results
+- `examples/metashape_proc_p1.py` — process RGB-only (P1 single-mount)
+
+### Extra Mode / Advanced Features
+
+See `docs/EXTRA_MODE_README.md`, `docs/UPSCALE_PROJECT_CREATION_EXTRAMODE_README.md`,
+and `docs/QUICK_REFERENCE_EXTRA_MODE.md`.
+
+## Funding
+
+This project was funded by TERN Landscapes.
+
+## Authors
+
+- Poornima Sivanandam (Original Author)
+- Darren Turner (Original Author)
+- Arko Lucieer (Original Author), School of Geography, Planning, and Spatial Sciences, University of Tasmania
+- Jan Ziegler (Modifying Author)
+
+## Acknowledgements
+
+- TERN Landscapes
+- TERN Surveillance
+- TERN Data Services
+- Swiss Federal Office of Topography (Swisstopo)
+
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
