@@ -1129,7 +1129,8 @@ def ret_micasense_pos(absolute_micasense_file_list, mrk_folder, micasense_folder
                 # Fallback to pyproj transformer if API fails
                 try:
                     E, N = transformer.transform(lat, lon)
-                    P1_pos.append([E, N, alt])
+                    h_fallback = apply_htrans_correction(lon, lat, alt, htrans_path, fallback_path=htrans_fallback) if htrans_path else alt
+                    P1_pos.append([E, N, h_fallback])
                     logging.warning(f"Used pyproj fallback for position {i}: lat={lat}, lon={lon}")
                 except Exception as e:
                     logging.error(f"Both API and pyproj failed for position {i}: {e}")
@@ -1146,7 +1147,7 @@ def ret_micasense_pos(absolute_micasense_file_list, mrk_folder, micasense_folder
     if P1_events:
         p1_sorted = sorted(P1_events)
         p1_ms = [dt.isoformat(timespec='milliseconds') for dt in p1_sorted]
-        print(f"P1 window  : {p1_ms[0]}  →  {p1_ms[-1]}")
+        print(f"P1 window  : {p1_ms[0]}  ->  {p1_ms[-1]}")
         print(f"P1 images  : {len(p1_sorted)}")
         print("P1 timestamps (all):")
         for i, ts in enumerate(p1_ms):
@@ -1157,7 +1158,7 @@ def ret_micasense_pos(absolute_micasense_file_list, mrk_folder, micasense_folder
     if mica_events:
         mica_sorted = sorted(mica_events)
         mica_ms = [dt.isoformat(timespec='milliseconds') for dt in mica_sorted]
-        print(f"\nMicaSense window : {mica_ms[0]}  →  {mica_ms[-1]}")
+        print(f"\nMicaSense window : {mica_ms[0]}  ->  {mica_ms[-1]}")
         print(f"MicaSense images : {len(mica_sorted)}")
         print(f"(MICA_deltat={MICA_deltat}s applied to raw EXIF — timestamps shifted by {-MICA_deltat:+.0f}s)")
         print("MicaSense timestamps — first 10:")
@@ -1176,7 +1177,7 @@ def ret_micasense_pos(absolute_micasense_file_list, mrk_folder, micasense_folder
             within_p1 = [dt for dt in mica_sorted if p1_start_epoch <= dt.timestamp() <= p1_end_epoch]
             after_p1  = [dt for dt in mica_sorted if dt.timestamp() > p1_end_epoch]
 
-            print(f"\nMicaSense vs P1 window ({p1_ms[0]} → {p1_ms[-1]}):")
+            print(f"\nMicaSense vs P1 window ({p1_ms[0]} -> {p1_ms[-1]}):")
             print(f"  Before P1 window : {len(before_p1)} images")
             print(f"  Within P1 window : {len(within_p1)} images")
             print(f"  After P1 window  : {len(after_p1)} images")
