@@ -1,0 +1,128 @@
+================================================================================
+COMPREHENSIVE DRONE FILE CHECKER REPORT
+================================================================================
+Generated: 2026-05-06 14:27:35
+Base Directory: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects
+Total Site/Date Combinations Checked: 134
+
+OVERALL SUMMARY:
+----------------------------------------
+Complete (≥95%):        122 (91.0%)
+Mostly Complete (75-94%):   0 (0.0%)
+Partially Complete (25-74%):   4 (3.0%)
+Minimal Progress (<25%):   8 (6.0%)
+
+SITE-LEVEL SUMMARY:
+----------------------------------------
+Site                 Dates  Avg Complete Status
+------------------------------------------------------------
+Brüttelen_sanasilva50845 8         100.0%     COMPLETE ✓
+Davos_LWF            6         100.0%     COMPLETE ✓
+Illgraben            8         100.0%     COMPLETE ✓
+Isone_LWF            7         100.0%     COMPLETE ✓
+Laegern              1           0.0%     NEEDS WORK
+Lens_LWF             9          88.9%     MOSTLY COMPLETE
+Marteloskop          7         100.0%     COMPLETE ✓
+Neunkirch_LWF        9         100.0%     COMPLETE ✓
+Pfynwald             16         93.8%     MOSTLY COMPLETE
+Sagno_treenet        7          94.3%     MOSTLY COMPLETE
+Salgesch_treenet     8         100.0%     COMPLETE ✓
+Schänis_LWF          8          72.5%     PARTIALLY COMPLETE
+Schüpfen_sanasilva50877 8         100.0%     COMPLETE ✓
+Sempach_treenet      8          87.5%     MOSTLY COMPLETE
+Stillberg            7          85.7%     MOSTLY COMPLETE
+Visp_LWF             7         100.0%     COMPLETE ✓
+WangenBrüttisellen_treenet 8         100.0%     COMPLETE ✓
+funes_project        1           0.0%     NEEDS WORK
+nigras_project       1           0.0%     NEEDS WORK
+
+MOST COMMON ISSUES:
+----------------------------------------
+ 11x  Missing multispectral orthophoto
+ 11x  Missing multispectral processing report
+  7x  Missing RGB orthophoto
+  7x  Missing RGB processing report
+  7x  Missing 3D model (OBJ)
+  4x  Very small total export size (0 B)
+  3x  Exports directory not found
+  3x  References directory not found
+  1x  Project directory not found
+
+SITES NEEDING ATTENTION (< 75% complete):
+----------------------------------------
+
+funes_project/20250912 - MINIMAL PROGRESS (0.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\funes_project\20250912
+  Exports: NOT FOUND
+  Files: RGB Ortho ✗ | MS Ortho ✗ | 3D Model ✗ | RGB Report ✗ | MS Report ✗
+  Issues: Exports directory not found; References directory not found; Missing RGB orthophoto; Missing multispectral orthophoto; Missing RGB processing report; Missing multispectral processing report; Missing 3D model (OBJ)
+
+Pfynwald/20250819 - MINIMAL PROGRESS (0.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Pfynwald\20250819
+  Exports: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Pfynwald\20250819\exports
+  Files: RGB Ortho ✗ | MS Ortho ✗ | 3D Model ✗ | RGB Report ✗ | MS Report ✗
+  Issues: Missing RGB orthophoto; Missing multispectral orthophoto; Missing RGB processing report; Missing multispectral processing report; Missing 3D model (OBJ); Very small total export size (0 B)
+
+Stillberg/20251002 - MINIMAL PROGRESS (0.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Stillberg\20251002
+  Exports: NOT FOUND
+  Files: RGB Ortho ✗ | MS Ortho ✗ | 3D Model ✗ | RGB Report ✗ | MS Report ✗
+  Issues: Exports directory not found; References directory not found; Missing RGB orthophoto; Missing multispectral orthophoto; Missing RGB processing report; Missing multispectral processing report; Missing 3D model (OBJ)
+
+nigras_project/20250912 - MINIMAL PROGRESS (0.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\nigras_project\20250912
+  Exports: NOT FOUND
+  Files: RGB Ortho ✗ | MS Ortho ✗ | 3D Model ✗ | RGB Report ✗ | MS Report ✗
+  Issues: Exports directory not found; References directory not found; Missing RGB orthophoto; Missing multispectral orthophoto; Missing RGB processing report; Missing multispectral processing report; Missing 3D model (OBJ)
+
+Laegern/20260227 - PROJECT NOT FOUND (0.0%)
+  Project: NOT FOUND
+  Exports: NOT FOUND
+  Files: RGB Ortho ✗ | MS Ortho ✗ | 3D Model ✗ | RGB Report ✗ | MS Report ✗
+  Issues: Project directory not found
+
+Schänis_LWF/20250718 - MINIMAL PROGRESS (0.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Schänis_LWF\20250718
+  Exports: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Schänis_LWF\20250718\exports
+  Files: RGB Ortho ✗ | MS Ortho ✗ | 3D Model ✗ | RGB Report ✗ | MS Report ✗
+  Issues: Missing RGB orthophoto; Missing multispectral orthophoto; Missing RGB processing report; Missing multispectral processing report; Missing 3D model (OBJ); Very small total export size (0 B)
+
+Sempach_treenet/20250718 - MINIMAL PROGRESS (0.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Sempach_treenet\20250718
+  Exports: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Sempach_treenet\20250718\exports
+  Files: RGB Ortho ✗ | MS Ortho ✗ | 3D Model ✗ | RGB Report ✗ | MS Report ✗
+  Issues: Missing RGB orthophoto; Missing multispectral orthophoto; Missing RGB processing report; Missing multispectral processing report; Missing 3D model (OBJ); Very small total export size (0 B)
+
+Lens_LWF/20250722 - MINIMAL PROGRESS (0.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Lens_LWF\20250722
+  Exports: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Lens_LWF\20250722\exports
+  Files: RGB Ortho ✗ | MS Ortho ✗ | 3D Model ✗ | RGB Report ✗ | MS Report ✗
+  Issues: Missing RGB orthophoto; Missing multispectral orthophoto; Missing RGB processing report; Missing multispectral processing report; Missing 3D model (OBJ); Very small total export size (0 B)
+
+Sagno_treenet/20251006 - PARTIALLY COMPLETE (60.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Sagno_treenet\20251006
+  Exports: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Sagno_treenet\20251006\exports
+  Files: RGB Ortho ✓ | MS Ortho ✗ | 3D Model ✓ | RGB Report ✓ | MS Report ✗
+  Issues: Missing multispectral orthophoto; Missing multispectral processing report
+
+Schänis_LWF/20240812 - PARTIALLY COMPLETE (60.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Schänis_LWF\20240812
+  Exports: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Schänis_LWF\20240812\exports
+  Files: RGB Ortho ✓ | MS Ortho ✗ | 3D Model ✓ | RGB Report ✓ | MS Report ✗
+  Issues: Missing multispectral orthophoto; Missing multispectral processing report
+
+Schänis_LWF/20240920 - PARTIALLY COMPLETE (60.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Schänis_LWF\20240920
+  Exports: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Schänis_LWF\20240920\exports
+  Files: RGB Ortho ✓ | MS Ortho ✗ | 3D Model ✓ | RGB Report ✓ | MS Report ✗
+  Issues: Missing multispectral orthophoto; Missing multispectral processing report
+
+Schänis_LWF/20250430 - PARTIALLY COMPLETE (60.0%)
+  Project: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Schänis_LWF\20250430
+  Exports: M:\working_package_2\2024_dronecampaign\02_processing\metashape_projects\Upscale_Metashapeprojects\Schänis_LWF\20250430\exports
+  Files: RGB Ortho ✓ | MS Ortho ✗ | 3D Model ✓ | RGB Report ✓ | MS Report ✗
+  Issues: Missing multispectral orthophoto; Missing multispectral processing report
+
+================================================================================
+END OF REPORT
+================================================================================

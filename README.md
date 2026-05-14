@@ -30,10 +30,8 @@ src/
 │   └── TransformHeight.py           # Height/geoid transformation
 │
 ├── project_management/          # Project creation and validation
-│   ├── CreateProjectsUpscale.py     # Create projects from CSV (standard)
+│   ├── UpscaleProjectCreation_ExtraMode.py  # Standard project creation (--extra-mode for new sites)
 │   ├── CreateMultispectralProjects.py  # Multispectral-only project creation
-│   ├── UpscaleProjectCreation2025.py   # 2025 campaign project creation
-│   ├── UpscaleProjectCreation_ExtraMode.py  # Extra-mode project creation
 │   ├── initiate_project.py          # Low-level project initialisation
 │   ├── validate_projects.py         # Validate Metashape project paths
 │   └── OpenProjectsfromCSV.py       # Metashape GUI script (open from CSV)
@@ -125,7 +123,10 @@ python scripts\testing\test_metashape_installation.py
 
 1. **Create projects** from CSV:
    ```bash
-   python src/project_management/CreateProjectsUpscale.py input.csv
+   # Standard sites (in SITE_MAPPING):
+   python src/project_management/UpscaleProjectCreation_ExtraMode.py input.csv
+   # New / test sites not in the mapping:
+   python src/project_management/UpscaleProjectCreation_ExtraMode.py input.csv --extra-mode
    ```
 2. *(Optional)* Place `src/project_management/OpenProjectsfromCSV.py` in
    `C:\Program Files\Agisoft\Metashape Pro\scripts\` and use
@@ -150,6 +151,66 @@ python scripts\testing\test_metashape_installation.py
 Required columns: `date`, `site`, `project_path`  
 Image-path columns (either form is accepted): `rgb` / `rgb_data_path`, `multispec` / `multispec_data_path`  
 Optional column: `sunsens` (set to `true` to enable sun-sensor reflectance calibration)
+
+### Coordinate and Height Transformation (Switzerland)
+
+This is a critical step in the Swiss processing workflow. The pipeline performs
+two independent transformations for every P1 camera position:
+
+#### 1. Horizontal: WGS84 → LV95 (EPSG:2056)
+
+The Swisstopo `wgs84tolv95` REST API transforms WGS84 geographic coordinates
+(lat/lon from MRK file or DJI XMP `GpsLatitude`/`GpsLongitude`) into
+CH1903+/LV95 easting/northing. The API also returns an altitude (LN02), but
+this is discarded — the height is handled separately (see below).
+
+#### 2. Vertical: ETRS89 ellipsoidal → LHN95 orthometric
+
+The DJI P1 records heights as **ETRS89 ellipsoidal** in the MRK file and in
+the XMP tag `drone-dji:AbsoluteAltitude`. These are **not** orthometric heights
+and must be converted before use in Metashape.
+
+The conversion uses the swisstopo CHGeo2004 geoid grid (`ETRS.tif`):
+
+```
+H_LHN95 = h_ETRS89 - N
+```
+
+where `N` is the geoid undulation (≈ 47–54 m for Switzerland) sampled from
+the grid using **bilinear interpolation** at the camera's WGS84 position.
+Bilinear interpolation is essential — nearest-neighbour sampling produces
+errors up to ~260 mm.
+
+**Accuracy** (verified against swisstopo Reframe GeoSuite):
+- Central Switzerland (e.g. lwf_lens, ~1160 m): **~7 mm** mean offset
+- Southern border / Ticino: **~58 mm** (grid accuracy limit at coverage edge)
+
+**Fallback chain** (applied per-point, in order):
+1. `ETRS.tif` (swisstopo CHGeo2004, LHN95) — pass with `--htrans`
+2. `ExtendedGeoid.tif` (EGM2008, global) — pass with `--htrans-fallback`
+3. ETRS89 ellipsoidal unchanged (logged as warning)
+
+**CLI usage:**
+```bash
+python src/core/batch_processor.py input.csv \
+    --htrans   "M:/geoid/Swisstopo/ETRS.tif" \
+    --htrans-fallback "M:/geoid/ExtendedGeoid.tif"
+```
+
+#### 3. MRK validity and EXIF fallback
+
+Before using MRK positions the pipeline validates the file:
+1. Checks every entry has a valid GPS fix (non-zero coordinates)
+2. Spot-checks a sample of MRK positions against the DJI XMP fields
+   `GpsLatitude`, `GpsLongitude`, and `AbsoluteAltitude` from the JPG headers
+
+If the MRK is all-zeros (no RTK fix) **or** its positions disagree with EXIF,
+the pipeline falls back to reading positions and timestamps directly from the
+XMP block of each P1 JPG (`drone-dji:UTCAtExposure` for timing,
+`drone-dji:AbsoluteAltitude` for height). This ensures MicaSense position
+interpolation still works even when the MRK file is faulty.
+
+---
 
 ### Geoid / Height Audit
 

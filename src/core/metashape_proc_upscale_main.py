@@ -887,7 +887,7 @@ def proc_multispec(rgb_dem_files):
             logging.warning(f"Failed to load existing Micasense position CSV: {MICASENSE_CAM_CSV}. Error: {e}")
             print("Falling back to ret_micasense_pos function to generate positions.")
             logging.info("Falling back to ret_micasense_pos function to generate positions.")
-            ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec, htrans_path=args.htrans)
+            ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV), P1_shift_vec, htrans_path=args.htrans, htrans_fallback=args.htrans_fallback, p1_ref_csv=str(P1_CAM_CSV_CH1903))
             chunk.importReference(str(MICASENSE_CAM_CSV), format=Metashape.ReferenceFormatCSV, columns="nxyz",
                                   delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
             chunk.crs = target_crs
@@ -898,7 +898,7 @@ def proc_multispec(rgb_dem_files):
         logging.info(f"Micasense position CSV does not exist: {MICASENSE_CAM_CSV}")
         print("Using ret_micasense_pos function to generate positions.")
         logging.info("Using ret_micasense_pos function to generate positions.")
-        ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV_UPDATED), P1_shift_vec, htrans_path=args.htrans)
+        ret_micasense_pos(micasense_master_paths, MRK_PATH, MICASENSE_PATH, img_suffix_master, args.crs, str(MICASENSE_CAM_CSV_UPDATED), P1_shift_vec, htrans_path=args.htrans, htrans_fallback=args.htrans_fallback, p1_ref_csv=str(P1_CAM_CSV_CH1903))
         chunk.importReference(str(MICASENSE_CAM_CSV_UPDATED), format=Metashape.ReferenceFormatCSV, columns="nxyz",
                                 delimiter=",", crs=target_crs, skip_rows=1, items=Metashape.ReferenceItemsCameras)
         chunk.crs = target_crs
@@ -1164,9 +1164,14 @@ parser.add_argument('-rgb', help='path to RGB level0_raw folder that also has th
 parser.add_argument('-smooth', help='Smoothing strength used to smooth RGB mesh low/med/high', default="medium")
 parser.add_argument('-drtk', help='If RGB coordinates to be blockshifted, file containing \
                                                   DRTK base station coordinates from field and AUSPOS', default=None)
-parser.add_argument('-htrans', help='Path to Swisstopo CHGeo2004 htrans GeoTIFF '
-                                    '(chgeo2004_htrans_ETRS89.tif or equivalent). '
-                                    'When provided, camera heights are converted from LN02 to LHN95.',
+parser.add_argument('-htrans', help='Path to Swisstopo CHGeo2004 GeoTIFF '
+                                    '(Swisstopo/ETRS.tif). '
+                                    'When provided, camera heights are converted from ETRS89 ellipsoidal to LHN95.',
+
+                    default=None)
+parser.add_argument('-htrans-fallback', dest='htrans_fallback',
+                    help='Path to a fallback geoid GeoTIFF (e.g. ExtendedGeoid.tif) used when '
+                         'the primary -htrans grid has no coverage for a point.',
                     default=None)
 parser.add_argument('-sunsens', help='use sun sensor data for reflectance calibration', action='store_true')
 parser.add_argument('-test', help='make processing faster for debugging', action='store_true')
@@ -1290,11 +1295,17 @@ if args.drtk is not None:
 if args.htrans is not None:
     if not Path(args.htrans).is_file():
         sys.exit("%s file does not exist. Check and input correct path using -htrans option" % str(args.htrans))
-    logging.info(f"LN02→LHN95 htrans correction enabled using: {args.htrans}")
-    print(f"LN02→LHN95 htrans correction enabled using: {args.htrans}")
+    logging.info(f"LN02->LHN95 htrans correction enabled using: {args.htrans}")
+    print(f"LN02->LHN95 htrans correction enabled using: {args.htrans}")
 else:
     logging.info("No htrans file provided. Heights will be LN02 (from wgs84tolv95 API).")
     print("No htrans file provided. Heights will be LN02 (from wgs84tolv95 API).")
+
+if args.htrans_fallback is not None:
+    if not Path(args.htrans_fallback).is_file():
+        sys.exit("%s file does not exist. Check and input correct path using -htrans-fallback option" % str(args.htrans_fallback))
+    logging.info(f"Htrans fallback geoid enabled using: {args.htrans_fallback}")
+    print(f"Htrans fallback geoid: {args.htrans_fallback}")
 
 if args.smooth not in DICT_SMOOTH_STRENGTH:
     sys.exit("Value for -smooth must be one of low, medium or high.")

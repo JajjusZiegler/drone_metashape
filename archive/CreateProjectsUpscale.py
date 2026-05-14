@@ -141,6 +141,7 @@ def add_images_to_project(doc, rgb_path, multispec_path, proj_file):
     multispec_chunk = doc.addChunk()
     multispec_chunk.label = CHUNK_MULTISPEC
     multispec_chunk.addPhotos(micasense_images)
+    multispec_chunk.locateReflectancePanels()
 
     # Validate multispec chunk
     if len(multispec_chunk.cameras) == 0:
@@ -149,7 +150,7 @@ def add_images_to_project(doc, rgb_path, multispec_path, proj_file):
         raise ValueError("Multispec chunk has invalid CRS")
 
     # Validate sensor offsets
-    if P1_GIMBAL1_OFFSET == 0:
+    if P1_GIMBAL1_OFFSET == (0, 0, 0):
         raise ValueError("Invalid P1 gimbal offset")
 
     # Check MicaSense configuration

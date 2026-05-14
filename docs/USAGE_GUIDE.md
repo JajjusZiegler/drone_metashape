@@ -42,7 +42,10 @@ data/
 ### 3. Create Metashape Projects
 
 ```bash
-python src/project_management/CreateProjectsUpscale.py input.csv
+# Standard sites (in SITE_MAPPING):
+python src/project_management/UpscaleProjectCreation_ExtraMode.py input.csv
+# New / test sites not in the mapping:
+python src/project_management/UpscaleProjectCreation_ExtraMode.py input.csv --extra-mode
 ```
 
 Or use the Metashape GUI script:
@@ -132,10 +135,8 @@ Converts ellipsoidal heights to orthometric heights using a geoid model.
 
 | Script | Description |
 |---|---|
-| `src/project_management/CreateProjectsUpscale.py` | Create projects from CSV (standard Upscale) |
+| `src/project_management/UpscaleProjectCreation_ExtraMode.py` | Standard project creation; `--extra-mode` for new sites |
 | `src/project_management/CreateMultispectralProjects.py` | Create projects for multispectral-only campaigns |
-| `src/project_management/UpscaleProjectCreation2025.py` | 2025 campaign project creation |
-| `src/project_management/UpscaleProjectCreation_ExtraMode.py` | Extra-mode project creation |
 | `src/project_management/initiate_project.py` | Low-level project initialisation helpers |
 | `src/project_management/validate_projects.py` | Validate Metashape project paths |
 | `src/project_management/OpenProjectsfromCSV.py` | Metashape GUI script — open projects from CSV |

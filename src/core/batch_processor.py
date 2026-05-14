@@ -400,11 +400,11 @@ def setup_project_logger(project: ProjectData) -> logging.Logger:
 # Processing Functions
 # ============================================================================
 
-def build_processing_command(project: ProjectData, crs: str, smooth: str, test_mode: bool) -> List[str]:
+def build_processing_command(project: ProjectData, crs: str, smooth: str, test_mode: bool, htrans: str = None, htrans_fallback: str = None) -> List[str]:
     """Build the command to execute for processing a project"""
     cmd = [
-        METASHAPE_PYTHON_PATH,
-        TARGET_SCRIPT_PATH,
+        str(METASHAPE_PYTHON_PATH),
+        str(TARGET_SCRIPT_PATH),
         "-proj_path", str(project.project_path),
         "-date", project.date,
         "-site", project.site,
@@ -423,6 +423,14 @@ def build_processing_command(project: ProjectData, crs: str, smooth: str, test_m
     # Add sun sensor flag
     if project.sunsens:
         cmd.append("-sunsens")
+    
+    # Add htrans geoid correction file
+    if htrans:
+        cmd.extend(["-htrans", htrans])
+
+    # Add htrans fallback geoid
+    if htrans_fallback:
+        cmd.extend(["-htrans-fallback", htrans_fallback])
     
     # Add test flag
     if test_mode:
@@ -486,7 +494,7 @@ def monitor_subprocess(process, project_logger, timeout_seconds: int) -> Tuple[b
     
     return timed_out, output_paths
 
-def process_project(project: ProjectData, crs: str, smooth: str, test_mode: bool, timeout: int, logger: logging.Logger) -> Dict:
+def process_project(project: ProjectData, crs: str, smooth: str, test_mode: bool, timeout: int, logger: logging.Logger, htrans: str = None, htrans_fallback: str = None) -> Dict:
     """
     Process a single project.
     Returns: dict with processing results
@@ -507,7 +515,7 @@ def process_project(project: ProjectData, crs: str, smooth: str, test_mode: bool
     project_logger.info(f"Multispec data: {project.multispec_exists}")
     
     # Build command
-    cmd = build_processing_command(project, crs, smooth, test_mode)
+    cmd = build_processing_command(project, crs, smooth, test_mode, htrans=htrans, htrans_fallback=htrans_fallback)
     project_logger.info(f"Executing command: {' '.join(cmd)}")
     logger.info(f"  Command: {' '.join(cmd)}")
     
@@ -698,7 +706,9 @@ Examples:
     )
     
     parser.add_argument('csv_file', help='Path to CSV file with project information')
-    parser.add_argument('--test', action='store_true', help='Test mode (dry-run, validation only)')
+    parser.add_argument('--test', action='store_true', help='Test mode (dry-run, validation only — no actual processing)')
+    parser.add_argument('--low-quality', action='store_true',
+                       help='Run actual processing at reduced quality (low align + lowest depth maps). Useful for end-to-end functional tests.')
     parser.add_argument('--crs', default=DEFAULT_CRS, help=f'CRS EPSG code (default: {DEFAULT_CRS})')
     parser.add_argument('--smooth', choices=['low', 'medium', 'high'], default=DEFAULT_SMOOTH,
                        help=f'Smoothing strength for RGB model (default: {DEFAULT_SMOOTH})')
@@ -708,6 +718,12 @@ Examples:
                        help='Skip projects that appear already processed (default: True)')
     parser.add_argument('--show-all', action='store_true',
                        help='Show all projects including already processed')
+    parser.add_argument('--htrans', default=None,
+                       help='Path to Swisstopo CHGeo2004 htrans GeoTIFF for LN02->LHN95 height correction '
+                            '(e.g. Swisstopo/ETRS.tif). Optional; omit to use LN02 heights.')
+    parser.add_argument('--htrans-fallback', dest='htrans_fallback', default=None,
+                       help='Path to a fallback geoid GeoTIFF (e.g. ExtendedGeoid.tif) used when '
+                            'the primary --htrans grid has no coverage for a point.')
     
     args = parser.parse_args()
     
@@ -720,10 +736,12 @@ Examples:
     logger.info("="*80)
     logger.info(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info(f"CSV File: {args.csv_file}")
-    logger.info(f"Mode: {'TEST/DRY-RUN' if args.test else 'PRODUCTION'}")
+    logger.info(f"Mode: {'TEST/DRY-RUN' if args.test else ('LOW QUALITY' if getattr(args, 'low_quality', False) else 'PRODUCTION')}")
     logger.info(f"CRS: EPSG:{args.crs}")
     logger.info(f"Smoothing: {args.smooth}")
     logger.info(f"Timeout: {args.timeout}s ({args.timeout/60:.1f} minutes)")
+    logger.info(f"Htrans: {args.htrans if args.htrans else 'None (heights will be LN02)'}")
+    logger.info(f"Htrans fallback: {args.htrans_fallback if args.htrans_fallback else 'None'}")
     logger.info("="*80)
     
     # Validate prerequisites
@@ -739,6 +757,18 @@ Examples:
         errors.append(f"Target script not found: {TARGET_SCRIPT_PATH}")
     else:
         logger.info(f"  [OK] Target script: {TARGET_SCRIPT_PATH}")
+    
+    if args.htrans is not None:
+        if not Path(args.htrans).is_file():
+            errors.append(f"Htrans GeoTIFF not found: {args.htrans}")
+        else:
+            logger.info(f"  [OK] Htrans file: {args.htrans}")
+
+    if args.htrans_fallback is not None:
+        if not Path(args.htrans_fallback).is_file():
+            errors.append(f"Htrans fallback GeoTIFF not found: {args.htrans_fallback}")
+        else:
+            logger.info(f"  [OK] Htrans fallback file: {args.htrans_fallback}")
     
     if errors:
         logger.error("\nFATAL ERRORS:")
@@ -858,7 +888,7 @@ Examples:
         logger.info(f"  Row {project.row_number} in CSV")
         
         if args.test:
-            # Test mode - just validate
+            # Dry-run mode - just validate
             result = {
                 'site': project.site,
                 'date': project.date,
@@ -869,8 +899,9 @@ Examples:
             }
             logger.info(f"  [OK] Test mode - validation passed")
         else:
-            # Real processing
-            result = process_project(project, args.crs, args.smooth, args.test, args.timeout, logger)
+            # Real processing (low_quality=True passes -test flag to the main script)
+            low_quality = getattr(args, 'low_quality', False)
+            result = process_project(project, args.crs, args.smooth, low_quality, args.timeout, logger, htrans=args.htrans, htrans_fallback=args.htrans_fallback)
             
             if result['success']:
                 logger.info(f"  [OK] Completed successfully")

@@ -86,10 +86,8 @@ class TestSrcProjectManagement(unittest.TestCase):
 
     EXPECTED = [
         "src/project_management/__init__.py",
-        "src/project_management/CreateProjectsUpscale.py",
-        "src/project_management/CreateMultispectralProjects.py",
-        "src/project_management/UpscaleProjectCreation2025.py",
         "src/project_management/UpscaleProjectCreation_ExtraMode.py",
+        "src/project_management/CreateMultispectralProjects.py",
         "src/project_management/initiate_project.py",
         "src/project_management/validate_projects.py",
         "src/project_management/OpenProjectsfromCSV.py",
